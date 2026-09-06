@@ -67,12 +67,14 @@ export const ReviewRequestSchema = z
     quantities: z.record(Symbol_, z.number().finite().nonnegative()).optional(),
     preference: PreferenceSchema.default("balanced"),
     daysSinceLastRebalance: z.number().finite().nonnegative().nullable().default(null),
-    source: z.enum(["public", "replay"]).default("public"),
+    source: z.enum(["public", "replay", "mcp"]).default("public"),
     dataset: z.string().max(200).optional(),
     bar: z.number().int().nonnegative().optional(),
     seedBar: z.number().int().nonnegative().optional(),
     seedNavUsd: z.number().finite().positive().max(1e12).optional(),
   })
+  // Only the hand-entered mode needs holdings in the request: replay seeds its
+  // own, and mcp reads them from the connected account.
   .refine((v) => v.source !== "public" || (v.quantities && Object.keys(v.quantities).length > 0), {
     message: "Live mode needs holdings — enter quantities, or use the replay source.",
     path: ["quantities"],

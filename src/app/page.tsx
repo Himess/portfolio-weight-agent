@@ -52,7 +52,8 @@ export default function Page() {
   const [preference, setPreference] = useState<Preference>("balanced");
   const [ctx, setCtx] = useState<Ctx | null>(null);
 
-  const [source, setSource] = useState<"replay" | "public">("replay");
+  const [source, setSource] = useState<"replay" | "public" | "mcp">("replay");
+  const [accountReady, setAccountReady] = useState(false);
   const [bar, setBar] = useState(8484);
   const [seedBar, setSeedBar] = useState(30);
   const [holdings, setHoldings] = useState<{ symbol: string; qty: string }[]>([
@@ -267,6 +268,8 @@ export default function Page() {
           ctx={ctx}
           source={source}
           setSource={setSource}
+          accountReady={accountReady}
+          onAccountChange={setAccountReady}
           bar={bar}
           setBar={setBar}
           seedBar={seedBar}
@@ -375,8 +378,10 @@ function Allocate(props: {
   preference: Preference;
   setPreference: (p: Preference) => void;
   ctx: Ctx | null;
-  source: "replay" | "public";
-  setSource: (s: "replay" | "public") => void;
+  source: "replay" | "public" | "mcp";
+  setSource: (s: "replay" | "public" | "mcp") => void;
+  accountReady: boolean;
+  onAccountChange: (connected: boolean) => void;
   bar: number;
   setBar: (n: number) => void;
   seedBar: number;
@@ -671,7 +676,7 @@ function Allocate(props: {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <McpPanel />
+        <McpPanel onConnectionChange={props.onAccountChange} />
 
         <div className="card card-p">
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>How closely to track</h2>
@@ -702,6 +707,14 @@ function Allocate(props: {
         <div className="card card-p">
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Data source</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
+            {props.accountReady && (
+              <SourceBtn
+                on={props.source === "mcp"}
+                onClick={() => props.setSource("mcp")}
+                title="My Binance account"
+                note="real balances, real depth"
+              />
+            )}
             <SourceBtn
               on={props.source === "replay"}
               disabled={!ctx?.replay}

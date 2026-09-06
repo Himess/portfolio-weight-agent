@@ -5,7 +5,7 @@ import { ReplayAdapter } from "@/adapters/replay";
 import { flattenTargets, validateAllocation } from "@/core/allocation";
 import { ReviewRequestSchema } from "@/lib/api-contracts";
 import { badRequest, failure } from "@/server/respond";
-import { publicAdapter, replayAdapter, statusFor } from "@/server/session";
+import { mcpBalances, publicAdapter, replayAdapter, statusFor } from "@/server/session";
 import type { Allocation } from "@/types";
 
 /** Buy the target allocation exactly, at a given replay bar. */
@@ -51,6 +51,18 @@ export async function POST(req: Request) {
     }
 
     let quantities = body.quantities ?? {};
+
+    // Read real holdings from the connected account. Market data still comes
+    // from the public API — see the note on mcpBalances.
+    if (source === "mcp") {
+      const holdings = await mcpBalances(body.allocation.cashSymbol);
+      quantities = Object.fromEntries(holdings.map((h) => [h.symbol, h.qty]));
+      if (Object.keys(quantities).length === 0) {
+        return badRequest(
+          "Your Agentic sub-account holds nothing yet. Fund it from Binance first — the agent cannot move funds into it.",
+        );
+      }
+    }
 
     if (source === "replay" && body.seedBar != null && market instanceof ReplayAdapter) {
       quantities = await seedOnTarget(market, body.allocation, body.seedBar, body.seedNavUsd ?? 100_000);

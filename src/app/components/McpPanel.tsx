@@ -33,7 +33,7 @@ type Status = {
   discoveredAt?: string | null;
 };
 
-export function McpPanel() {
+export function McpPanel({ onConnectionChange }: { onConnectionChange?: (connected: boolean) => void } = {}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,9 +43,14 @@ export function McpPanel() {
   const refresh = useCallback(() => {
     fetch("/api/mcp/status")
       .then((r) => r.json())
-      .then(setStatus)
+      .then((s: Status) => {
+        setStatus(s);
+        // The data-source picker can only offer the account once it is usable —
+        // connected is not enough, it must also expose a balance tool.
+        onConnectionChange?.(Boolean(s.connected && s.capabilities?.balances));
+      })
       .catch(() => setError("Could not read the connection status."));
-  }, []);
+  }, [onConnectionChange]);
 
   useEffect(() => {
     refresh();

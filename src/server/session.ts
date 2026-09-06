@@ -65,7 +65,41 @@ export function publicAdapter(quote = "USDT"): PublicAdapter {
   return adapter;
 }
 
-export function statusFor(kind: "public" | "replay"): AdapterStatus {
+/**
+ * Balances from the connected Binance account.
+ *
+ * Market data still comes from the public API even when MCP is connected — it
+ * is the same data, needs no authorization, and keeps the analysis path working
+ * if the connection drops mid-session. MCP is used for the two things only it
+ * can do: read the real balances, and place an approved order.
+ */
+export async function mcpBalances(cashSymbol = "USDT") {
+  const { discover } = await import("../server/mcp-client");
+  const { McpAccountAdapter } = await import("../adapters/mcp");
+  const { callTool } = await import("../server/mcp-client");
+
+  const { capabilities } = await discover();
+  if (!capabilities.balances) {
+    throw new Error(
+      "The connected Binance MCP server exposes no balance tool, so holdings cannot be read from it.",
+    );
+  }
+
+  const adapter = new McpAccountAdapter({ call: callTool }, capabilities, cashSymbol);
+  return adapter.getBalances();
+}
+
+export function statusFor(kind: "public" | "replay" | "mcp"): AdapterStatus {
+  if (kind === "mcp") {
+    return {
+      kind: "mcp",
+      label: "Binance account (MCP)",
+      canReadMarket: true,
+      canReadAccount: true,
+      canTrade: true,
+      note: "Balances read from your Agentic sub-account. Every order is confirmed by you in Binance; there is no withdrawal scope.",
+    };
+  }
   if (kind === "replay") {
     return {
       kind: "replay",
