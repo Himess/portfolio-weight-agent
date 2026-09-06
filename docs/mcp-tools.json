@@ -1,0 +1,32 @@
+{
+  "endpoint": "https://agent.binance.com/mcp/agentic",
+  "discoveredAt": "2026-09-06T17:25:03.375Z",
+  "note": "Binance does not publish the MCP tool list. This file is captured from the live server. Without a bearer token the server returns 401 and only the OAuth metadata is recorded.",
+  "oauthAuthorizationServer": {
+    "status": 200,
+    "body": {
+      "issuer": "https://agent.binance.com",
+      "authorization_endpoint": "https://accounts.binance.com/agentic-oauth/authorize",
+      "token_endpoint": "https://accounts.binance.com/oauth-agentic/token",
+      "token_endpoint_auth_methods_supported": [
+        "none"
+      ],
+      "response_types_supported": [
+        "code"
+      ],
+      "grant_types_supported": [
+        "authorization_code"
+      ],
+      "code_challenge_methods_supported": [
+        "S256"
+      ],
+      "client_id_metadata_document_supported": true
+    }
+  },
+  "unauthenticatedToolsList": {
+    "status": 401,
+    "wwwAuthenticate": "Bearer resource_metadata=\"https://agent.binance.com/.well-known/oauth-protected-resource/gateway-mcp\""
+  },
+  "tools": null,
+  "status": "NOT_DISCOVERED — set BINANCE_MCP_TOKEN to capture the real tool list"
+}

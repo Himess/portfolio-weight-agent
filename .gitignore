@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+
+# Replay datasets are large and regenerable: npm run klines
+data/*.json
+!data/.gitkeep
+
+# Replay journals are run output
+data/replay-journal.json

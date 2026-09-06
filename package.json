@@ -1,0 +1,35 @@
+{
+  "name": "portfolio-weight-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Selling your winners and buying your losers is psychologically hard. The agent proposes it; you approve it.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "klines": "tsx scripts/fetch-klines.ts",
+    "replay": "tsx scripts/replay.ts",
+    "mcp:discover": "tsx scripts/discover-mcp-tools.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^22.18.1",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "tailwindcss": "^4.1.13",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
