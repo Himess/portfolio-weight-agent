@@ -15,6 +15,47 @@ import { Say, Stat, TokenLogo } from "./ui";
 import { bps, pct, ppAbs, qty, usd } from "@/lib/format";
 import type { Proposal as ProposalType } from "@/types";
 
+/**
+ * The product's thesis, stated only when the plan actually does it.
+ *
+ * Rebalancing means selling what rose and buying what fell, which is the part
+ * people cannot make themselves do. When the plan has that shape, say so — but
+ * derive it from the figures rather than asserting it, because a plan that
+ * happens not to do it should not claim otherwise.
+ */
+function contrarianLine(proposal: ProposalType): string | null {
+  const { context, orderedTrades } = proposal;
+  if (orderedTrades.length === 0) return null;
+
+  const change = new Map(context.signals.map((s) => [s.symbol, s.priceChange24hPct]));
+  const traded = orderedTrades
+    .map((t) => ({ side: t.side, symbol: t.symbol, chg: change.get(t.symbol) }))
+    .filter((t): t is { side: "BUY" | "SELL"; symbol: string; chg: number } =>
+      typeof t.chg === "number" && Number.isFinite(t.chg),
+    );
+  if (traded.length === 0) return null;
+
+  const sells = traded.filter((t) => t.side === "SELL").sort((a, b) => b.chg - a.chg);
+  const buys = traded.filter((t) => t.side === "BUY").sort((a, b) => a.chg - b.chg);
+
+  const risingSell = sells[0] && sells[0].chg > 0 ? sells[0] : null;
+  const fallingBuy = buys[0] && buys[0].chg < 0 ? buys[0] : null;
+
+  // "down -2.5%" is a double negative; the word already carries the sign.
+  const mag = (n: number) => `${Math.abs(n).toFixed(1)}%`;
+
+  if (risingSell && fallingBuy) {
+    return `This sells ${risingSell.symbol}, up ${mag(risingSell.chg)} today, and buys ${fallingBuy.symbol}, down ${mag(fallingBuy.chg)}. That is the trade most people cannot make themselves.`;
+  }
+  if (risingSell) {
+    return `This trims ${risingSell.symbol} while it is up ${mag(risingSell.chg)} today — selling into strength, which is the part that feels wrong and is the point.`;
+  }
+  if (fallingBuy) {
+    return `This buys ${fallingBuy.symbol} while it is down ${mag(fallingBuy.chg)} today — adding to a loser, which is the part that feels wrong and is the point.`;
+  }
+  return null;
+}
+
 const FACTOR: Record<string, string> = {
   cost: "Cost",
   volatility: "Volatility",
@@ -53,6 +94,7 @@ export function ProposalView({
   }
 
   const cb = context.costBenefit;
+  const contrarian = contrarianLine(proposal);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -70,6 +112,29 @@ export function ProposalView({
         </div>
 
         <Say line={headline}>{body}</Say>
+
+        {contrarian && (
+          <div
+            style={{
+              marginTop: 20,
+              padding: "14px 16px",
+              borderRadius: "var(--r-inner)",
+              background: "var(--accent-soft)",
+              border: "1px solid var(--accent-line)",
+              fontSize: 13.5,
+              lineHeight: 1.55,
+              color: "var(--accent-ink)",
+              maxWidth: "68ch",
+            }}
+          >
+            {contrarian}
+          </div>
+        )}
+
+        <DriftBeforeAfter
+          before={cb.totalDriftBeforePp}
+          after={cb.totalDriftAfterPp}
+        />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 16 }}>
@@ -138,6 +203,33 @@ export function ProposalView({
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Drift before and after, on one scale, so the correction has a size. */
+function DriftBeforeAfter({ before, after }: { before: number; after: number }) {
+  const max = Math.max(before, after, 0.1);
+  const w = (v: number) => `${Math.max(2, (v / max) * 100)}%`;
+  return (
+    <div style={{ marginTop: 22, maxWidth: 460 }}>
+      <div className="lbl" style={{ marginBottom: 8 }}>
+        Drift, before and after
+      </div>
+      {[
+        { label: "now", v: before, color: "var(--ink)" },
+        { label: "after", v: after, color: "var(--green)" },
+      ].map((row) => (
+        <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+          <span style={{ fontSize: 11.5, color: "var(--ink-3)", width: 36 }}>{row.label}</span>
+          <div className="meter" style={{ flex: 1 }}>
+            <span style={{ width: w(row.v), background: row.color }} />
+          </div>
+          <span className="m" style={{ fontSize: 12.5, fontWeight: 600, width: 52, textAlign: "right" }}>
+            {row.v.toFixed(1)}pp
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
