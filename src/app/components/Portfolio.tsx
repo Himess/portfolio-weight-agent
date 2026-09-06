@@ -8,7 +8,7 @@
  * NAV is secondary. Everything else is a supporting row.
  */
 
-import { Dev, Ring, Sparkline, Swatch } from "./ui";
+import { Dev, Ring, Sparkline, Swatch, TokenLogo } from "./ui";
 import { pct, pp, ppAbs, usd } from "@/lib/format";
 import type { PortfolioState } from "@/types";
 
@@ -118,6 +118,7 @@ export function Portfolio({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 {i != null ? <Swatch i={i} /> : <span style={{ width: 9 }} />}
+                <TokenLogo symbol={r.symbol} size={28} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 650, fontSize: 14 }}>{r.symbol}</div>
                   <div className="m" style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 2 }}>

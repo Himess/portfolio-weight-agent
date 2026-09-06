@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 
-import { Say, Stat, N } from "./ui";
+import { Say, Stat, TokenLogo } from "./ui";
 import { bps, pct, ppAbs, qty, usd } from "@/lib/format";
 import type { Proposal as ProposalType } from "@/types";
 
@@ -101,6 +101,7 @@ export function ProposalView({
             <span className={`pill ${t.side === "BUY" ? "pill-green" : "pill-red"}`} style={{ fontWeight: 700 }}>
               {t.side}
             </span>
+            <TokenLogo symbol={t.symbol} size={28} />
             <div style={{ minWidth: 170 }}>
               <div style={{ fontSize: 14.5, fontWeight: 650 }}>
                 <span className="m">{qty(t.qty)}</span> {t.symbol}
@@ -242,6 +243,7 @@ function Hold({
                   className="refused-row"
                   style={{ marginTop: i === 0 ? 0 : 14 }}
                 >
+                  <TokenLogo symbol={t.symbol} size={32} />
                   <div style={{ flex: 1 }}>
                     <div className="strike" style={{ fontSize: 15.5, fontWeight: 650 }}>
                       {t.side === "SELL" ? "Sell" : "Buy"} <span className="m">{qty(t.qty)}</span> {t.symbol}

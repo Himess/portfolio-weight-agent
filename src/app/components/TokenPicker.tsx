@@ -15,8 +15,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Sparkline } from "./ui";
+import { Skeleton, Sparkline, TokenLogo, TokenRowSkeleton } from "./ui";
 import { CATEGORIES, type CategoryKey, displayName, inCategory } from "@/lib/categories";
+import { assess, tierLabel } from "@/lib/safety";
 
 export type TokenRow = {
   symbol: string;
@@ -43,37 +44,6 @@ function volume(n: number): string {
   return `$${(n / 1e3).toFixed(0)}K`;
 }
 
-/** Deterministic, low-chroma tint so the monograms sit inside the palette. */
-function tint(symbol: string): string {
-  let h = 0;
-  for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) % 360;
-  return `hsl(${h} 32% 88%)`;
-}
-
-function Mono({ symbol }: { symbol: string }) {
-  return (
-    <div
-      style={{
-        width: 32,
-        height: 32,
-        flex: "none",
-        borderRadius: 999,
-        background: tint(symbol),
-        border: "1px solid var(--line)",
-        display: "grid",
-        placeItems: "center",
-        fontSize: symbol.length > 4 ? 9 : 10.5,
-        fontWeight: 800,
-        color: "var(--ink-2)",
-        letterSpacing: "-0.02em",
-      }}
-      aria-hidden="true"
-    >
-      {symbol.slice(0, 4)}
-    </div>
-  );
-}
-
 export function TokenPicker({
   held,
   onToggle,
@@ -94,6 +64,11 @@ export function TokenPicker({
       .then((j) => (j.error ? setError(j.error) : setTokens(j.tokens as TokenRow[])))
       .catch(() => setError("Could not reach Binance market data."));
   }, []);
+
+  const universe = useMemo(
+    () => (tokens ?? []).map((t) => ({ symbol: t.symbol, quoteVolume24hUsd: t.quoteVolume24hUsd })),
+    [tokens],
+  );
 
   const list = useMemo(() => {
     if (!tokens) return [];
@@ -134,9 +109,13 @@ export function TokenPicker({
     <div className="card card-p">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Add assets</h2>
-        <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
-          {tokens ? `${tokens.length} tradable pairs · live prices` : "loading…"}
-        </span>
+        {tokens ? (
+          <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
+            {tokens.length} tradable pairs · live prices
+          </span>
+        ) : (
+          <Skeleton w={150} h={11} />
+        )}
       </div>
 
       <div className="search" style={{ marginTop: 14 }}>
@@ -168,9 +147,11 @@ export function TokenPicker({
 
       <div className="scroll" style={{ marginTop: 12, maxHeight: 340, marginInline: -6 }}>
         {!tokens && !error && (
-          <p style={{ fontSize: 12.5, color: "var(--ink-3)", padding: "16px 6px" }}>
-            Loading the tradable universe…
-          </p>
+          <>
+            {Array.from({ length: 6 }, (_, i) => (
+              <TokenRowSkeleton key={i} />
+            ))}
+          </>
         )}
 
         {tokens && list.length === 0 && (
@@ -183,12 +164,33 @@ export function TokenPicker({
           const on = held.has(t.symbol);
           const name = displayName(t.symbol);
           const up = t.change24hPct >= 0;
+          const safety = assess(t.symbol, t.quoteVolume24hUsd, universe);
           return (
             <button key={t.symbol} className="tk" data-in={on ? 1 : 0} onClick={() => onToggle(t.symbol)}>
-              <Mono symbol={t.symbol} />
+              <TokenLogo symbol={t.symbol} />
 
               <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t.symbol}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{t.symbol}</span>
+                  {safety.isLookalike && (
+                    <span
+                      className="pill pill-accent"
+                      style={{ padding: "1px 7px", fontSize: 9.5, fontWeight: 700 }}
+                      title={`Similar name to ${safety.confusableWith.join(", ")}, a much larger market. Check you meant this one.`}
+                    >
+                      like {safety.confusableWith[0]}
+                    </span>
+                  )}
+                  {(safety.tier === "thin" || safety.tier === "very-thin") && (
+                    <span
+                      className="pill pill-red"
+                      style={{ padding: "1px 7px", fontSize: 9.5, fontWeight: 700 }}
+                      title={tierLabel(safety.tier)}
+                    >
+                      thin
+                    </span>
+                  )}
+                </div>
                 <div
                   style={{
                     fontSize: 11.5,
@@ -223,7 +225,11 @@ export function TokenPicker({
 
       <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "12px 0 0", lineHeight: 1.55 }}>
         Prices, 24-hour changes and volumes are live from Binance. Category chips are an editorial
-        grouping — “All” is the full exchange list, and the chips only ever narrow it.
+        grouping — “All” is the full exchange list, and the chips only ever narrow it.{" "}
+        <strong style={{ fontWeight: 600, color: "var(--ink-2)" }}>thin</strong> marks a pair whose
+        daily volume is small enough that your own order moves the price;{" "}
+        <strong style={{ fontWeight: 600, color: "var(--ink-2)" }}>like&nbsp;X</strong> marks a
+        ticker that reads like a much larger one — the practical version of picking the wrong token.
       </p>
     </div>
   );
