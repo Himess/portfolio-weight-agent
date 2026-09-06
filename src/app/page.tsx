@@ -1,25 +1,21 @@
 "use client";
 
 /**
- * Four screens, nothing more (DESIGN.md §10):
- *   1. Set allocation   2. Portfolio view   3. Proposal   4. Confirmation handoff
+ * Four screens (DESIGN.md §10). Three of them carry the product:
+ * portfolio, proposal, and the HOLD state. Allocate is functional.
  */
 
 import { useEffect, useMemo, useState } from "react";
 
 import { Portfolio } from "./components/Portfolio";
 import { Handoff, ProposalView } from "./components/Proposal";
+import { Sparkline, Swatch } from "./components/ui";
 import { validateAllocation } from "@/core/allocation";
 import { pct } from "@/lib/format";
-import type {
-  Allocation,
-  BasketResolution,
-  Preference,
-  Proposal,
-  Target,
-} from "@/types";
+import type { Allocation, BasketResolution, Preference, Proposal, Target } from "@/types";
 
 type Screen = "allocate" | "portfolio" | "proposal" | "handoff";
+const SCREENS: Screen[] = ["allocate", "portfolio", "proposal", "handoff"];
 
 const DEFAULT_TARGETS: Target[] = [
   { kind: "asset", symbol: "BTC", weight: 0.4 },
@@ -48,14 +44,13 @@ type Ctx = {
 export default function Page() {
   const [screen, setScreen] = useState<Screen>("allocate");
   const [targets, setTargets] = useState<Target[]>(DEFAULT_TARGETS);
-  const [cashSymbol] = useState("USDT");
+  const cashSymbol = "USDT";
   const [preference, setPreference] = useState<Preference>("balanced");
   const [ctx, setCtx] = useState<Ctx | null>(null);
 
   const [source, setSource] = useState<"replay" | "public">("replay");
-  const [bar, setBar] = useState(8500);
+  const [bar, setBar] = useState(8484);
   const [seedBar, setSeedBar] = useState(30);
-  // Live mode has no account access without MCP, so holdings are entered here.
   const [holdings, setHoldings] = useState<{ symbol: string; qty: string }[]>([
     { symbol: "BTC", qty: "0.25" },
     { symbol: "ETH", qty: "5" },
@@ -65,6 +60,7 @@ export default function Page() {
   ]);
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [series, setSeries] = useState<Record<string, number[]>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,15 +69,15 @@ export default function Page() {
       .then((r) => r.json())
       .then((c: Ctx) => {
         setCtx(c);
-        if (c.replay) setBar(Math.max(60, c.replay.bars - 1));
         if (!c.replay) setSource("public");
       })
       .catch(() => setError("Could not load context."));
   }, []);
 
-  const allocation: Allocation = useMemo(() => ({ targets, cashSymbol }), [targets, cashSymbol]);
+  const allocation: Allocation = useMemo(() => ({ targets, cashSymbol }), [targets]);
   const validation = useMemo(() => validateAllocation(allocation), [allocation]);
   const totalWeight = targets.reduce((a, t) => a + t.weight, 0);
+  const onTarget = Math.abs(totalWeight - 1) < 1e-6;
 
   async function review() {
     setBusy(true);
@@ -111,6 +107,7 @@ export default function Page() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Review failed.");
       setProposal(json.proposal as Proposal);
+      setSeries((json.series as Record<string, number[]>) ?? {});
       setScreen("portfolio");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -119,67 +116,83 @@ export default function Page() {
     }
   }
 
+  const reached = (s: Screen): boolean => {
+    if (s === "allocate") return true;
+    if (!proposal) return false;
+    if (s === "handoff") return proposal.orderedTrades.length > 0;
+    return true;
+  };
+  const done = (s: Screen): boolean => SCREENS.indexOf(s) < SCREENS.indexOf(screen) && reached(s);
+
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-4">
+    <main style={{ maxWidth: 1240, margin: "0 auto", padding: "34px 26px 60px" }}>
+      <header style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
-            <h1 className="text-2xl font-semibold">Portfolio Weight Agent</h1>
-            <p className="mt-1 max-w-2xl text-sm text-mut">
-              Selling your winners and buying your losers is psychologically hard. The agent
-              proposes it; you approve it.
+            <h1 style={{ fontSize: 21, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
+              Portfolio Weight Agent
+            </h1>
+            <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "6px 0 0", maxWidth: "62ch", lineHeight: 1.5 }}>
+              Selling your winners and buying your losers is psychologically hard. The agent proposes
+              it; you approve it.
             </p>
           </div>
-          <div className="text-right text-xs text-mut">
-            {ctx && (
-              <>
-                <div>
-                  judgment layer:{" "}
-                  <span style={{ color: ctx.llmAvailable ? "var(--color-buy)" : "var(--color-accent)" }}>
-                    {ctx.llmAvailable ? ctx.model : "unavailable — deterministic fallback"}
-                  </span>
-                </div>
-                <div className="mt-0.5">
-                  math: deterministic, always
-                </div>
-              </>
-            )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, alignItems: "flex-end" }}>
+            <span className={ctx?.llmAvailable ? "pill pill-green" : "pill pill-accent"}>
+              <Dot on={Boolean(ctx?.llmAvailable)} />
+              {ctx ? (ctx.llmAvailable ? ctx.model : "no provider — deterministic fallback") : "…"}
+            </span>
+            <span className="pill pill-quiet">math: deterministic, always</span>
           </div>
         </div>
 
-        <nav className="mt-6 flex gap-1 text-sm">
-          {(["allocate", "portfolio", "proposal", "handoff"] as Screen[]).map((s, i) => {
-            const reachable =
-              s === "allocate" || (proposal != null && (s !== "handoff" || proposal.orderedTrades.length > 0));
+        {/* progress: completed steps are ticked, not just highlighted */}
+        <nav style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 22, flexWrap: "wrap" }}>
+          {SCREENS.map((s, i) => {
+            const active = screen === s;
+            const complete = done(s);
             return (
-              <button
-                key={s}
-                disabled={!reachable}
-                onClick={() => setScreen(s)}
-                className="rounded-lg px-3 py-1.5 capitalize disabled:opacity-30"
-                style={{
-                  background: screen === s ? "var(--color-panel-2)" : "transparent",
-                  color: screen === s ? "var(--color-fg)" : "var(--color-mut)",
-                }}
-              >
-                {i + 1}. {s}
-              </button>
+              <span key={s} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {i > 0 && <span style={{ width: 16, height: 1, background: "var(--line-2)" }} />}
+                <button
+                  disabled={!reached(s)}
+                  onClick={() => setScreen(s)}
+                  className="chip"
+                  data-on={active ? 1 : 0}
+                  style={{
+                    padding: "7px 14px",
+                    fontSize: 12.5,
+                    opacity: reached(s) ? 1 : 0.4,
+                    cursor: reached(s) ? "pointer" : "not-allowed",
+                    borderColor: complete && !active ? "var(--green-line)" : undefined,
+                    background: complete && !active ? "var(--green-bg)" : undefined,
+                    color: complete && !active ? "var(--green-ink)" : undefined,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {complete && !active ? "✓" : i + 1}. {s}
+                </button>
+              </span>
             );
           })}
         </nav>
       </header>
 
       {error && (
-        <div className="mb-6 rounded-xl border p-4 text-sm" style={{ borderColor: "var(--color-sell)" }}>
+        <div
+          className="card card-p"
+          style={{ borderColor: "var(--red-line)", background: "var(--red-bg)", color: "var(--red)", marginBottom: 18, fontSize: 13.5 }}
+        >
           {error}
         </div>
       )}
 
       {screen === "allocate" && (
-        <AllocateScreen
+        <Allocate
           targets={targets}
           setTargets={setTargets}
           totalWeight={totalWeight}
+          onTarget={onTarget}
           validation={validation}
           preference={preference}
           setPreference={setPreference}
@@ -198,17 +211,13 @@ export default function Page() {
       )}
 
       {screen === "portfolio" && proposal && (
-        <div className="space-y-6">
-          <Portfolio state={proposal.context.portfolio} cashSymbol={cashSymbol} />
-          <div className="flex gap-3">
-            <button
-              onClick={() => setScreen("proposal")}
-              className="rounded-lg px-5 py-2.5 text-sm font-semibold"
-              style={{ background: "var(--color-accent)", color: "var(--color-ink)" }}
-            >
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <Portfolio state={proposal.context.portfolio} cashSymbol={cashSymbol} series={series} />
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <button className="btn btn-primary" onClick={() => setScreen("proposal")}>
               See what the agent decided
             </button>
-            <button onClick={review} disabled={busy} className="rounded-lg border px-5 py-2.5 text-sm">
+            <button className="btn" onClick={review} disabled={busy}>
               {busy ? "Reviewing…" : "Re-run review"}
             </button>
           </div>
@@ -223,11 +232,9 @@ export default function Page() {
         />
       )}
 
-      {screen === "handoff" && proposal && (
-        <Handoff proposal={proposal} onBack={() => setScreen("proposal")} />
-      )}
+      {screen === "handoff" && proposal && <Handoff proposal={proposal} onBack={() => setScreen("proposal")} />}
 
-      <footer className="mt-12 border-t pt-6 text-xs leading-relaxed text-mut">
+      <footer style={{ marginTop: 44, paddingTop: 20, borderTop: "1px solid var(--line)", fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.65, maxWidth: "84ch" }}>
         Not investment advice. You are the decision-maker: every order requires your confirmation in
         Binance before it executes. The agent chooses and explains; every quantity, price and
         percentage on this page is computed by deterministic code, never by the model.
@@ -236,14 +243,30 @@ export default function Page() {
   );
 }
 
+function Dot({ on }: { on: boolean }) {
+  return (
+    <span
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: 999,
+        background: on ? "var(--green)" : "var(--amber)",
+        display: "inline-block",
+        flex: "none",
+      }}
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Screen 1 — Set allocation
+// Screen 1 — Allocate
 // ---------------------------------------------------------------------------
 
-function AllocateScreen(props: {
+function Allocate(props: {
   targets: Target[];
   setTargets: (t: Target[]) => void;
   totalWeight: number;
+  onTarget: boolean;
   validation: ReturnType<typeof validateAllocation>;
   preference: Preference;
   setPreference: (p: Preference) => void;
@@ -259,14 +282,14 @@ function AllocateScreen(props: {
   onReview: () => void;
   busy: boolean;
 }) {
-  const { targets, setTargets, totalWeight, validation, ctx } = props;
+  const { targets, setTargets, totalWeight, onTarget, validation, ctx } = props;
   const [phrase, setPhrase] = useState("");
   const [resolving, setResolving] = useState(false);
   const [pending, setPending] = useState<{ phrase: string; res: BasketResolution } | null>(null);
 
-  function setWeight(i: number, pctValue: number) {
+  function setWeight(i: number, v: number) {
     const next = [...targets];
-    next[i] = { ...next[i], weight: pctValue / 100 };
+    next[i] = { ...next[i], weight: v / 100 };
     setTargets(next);
   }
 
@@ -285,296 +308,280 @@ function AllocateScreen(props: {
     }
   }
 
-  function acceptBasket() {
-    if (!pending || pending.res.members.length === 0) return;
-    setTargets([
-      ...targets,
-      {
-        kind: "basket",
-        label: pending.phrase,
-        weight: 0,
-        members: pending.res.members,
-        // Pinned at approval — it will not silently re-resolve later (§7.3).
-        resolvedAt: new Date().toISOString(),
-        rationale: pending.res.rationale,
-      },
-    ]);
-    setPending(null);
-    setPhrase("");
-  }
-
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        <section className="rounded-2xl border bg-panel p-6">
-          <h2 className="font-semibold">Target allocation</h2>
-          <p className="mt-1 text-sm text-mut">
-            Declare it once. Weights must total 100%.
-          </p>
+    <div className="split split-main">
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="card card-p">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16 }}>
+            <div>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Target allocation</h2>
+              <p style={{ fontSize: 13, color: "var(--ink-2)", margin: "5px 0 0" }}>
+                Declare it once. Weights must total 100%.
+              </p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div className="m" style={{ fontSize: 22, fontWeight: 700, color: onTarget ? "var(--green)" : "var(--amber)" }}>
+                {pct(totalWeight * 100, 1)}
+              </div>
+              <div className="lbl">{onTarget ? "allocated" : `${(100 - totalWeight * 100).toFixed(1)}pp to place`}</div>
+            </div>
+          </div>
 
-          <div className="mt-5 space-y-2">
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
             {targets.map((t, i) => (
-              <div key={i} className="rounded-xl border bg-panel-2 p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="font-medium">
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 14px",
+                  borderRadius: "var(--r-inner)",
+                  border: "1px solid var(--line)",
+                  background: t.kind === "basket" ? "var(--accent-soft)" : "var(--surface-2)",
+                  borderColor: t.kind === "basket" ? "var(--accent-line)" : "var(--line)",
+                }}
+              >
+                <Swatch i={i} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>
                       {t.kind === "asset" ? t.symbol : t.label}
-                      {t.kind === "basket" && (
-                        <span className="ml-2 rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-mut">
+                    </span>
+                    {t.kind === "basket" && (
+                      <>
+                        <span className="pill pill-accent" style={{ padding: "2px 8px", fontSize: 9.5, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>
                           basket · pinned
                         </span>
-                      )}
-                    </div>
-                    {t.kind === "basket" && (
-                      <div className="mt-1 text-xs text-mut">
-                        {t.members.map((m) => `${m.symbol} ${pct(m.weight * 100, 0)}`).join(" · ")}
-                      </div>
+                        <span style={{ fontSize: 11, color: "var(--accent-ink)" }}>
+                          {t.members.length} assets, resolved once and frozen
+                        </span>
+                      </>
                     )}
                   </div>
-                  <input
-                    type="number"
-                    value={Number((t.weight * 100).toFixed(2))}
-                    onChange={(e) => setWeight(i, Number(e.target.value))}
-                    className="tnum w-20 rounded-lg border bg-panel px-2 py-1.5 text-right"
-                    step={1}
-                    min={0}
-                    max={100}
-                  />
-                  <span className="text-sm text-mut">%</span>
-                  <button
-                    onClick={() => setTargets(targets.filter((_, j) => j !== i))}
-                    className="rounded-lg border px-2 py-1 text-xs text-mut"
-                  >
-                    remove
-                  </button>
+                  {t.kind === "basket" && (
+                    <div className="m" style={{ fontSize: 11.5, color: "var(--ink-2)", marginTop: 5 }}>
+                      {t.members.map((m) => `${m.symbol} ${(m.weight * 100).toFixed(0)}%`).join("  ·  ")}
+                    </div>
+                  )}
                 </div>
+                <input
+                  type="number"
+                  value={Number((t.weight * 100).toFixed(2))}
+                  onChange={(e) => setWeight(i, Number(e.target.value))}
+                  className="m"
+                  style={{
+                    width: 66,
+                    padding: "7px 9px",
+                    textAlign: "right",
+                    borderRadius: "var(--r-sm)",
+                    border: "1px solid var(--line-2)",
+                    background: "var(--surface)",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                  step={1}
+                  min={0}
+                  max={100}
+                />
+                <span style={{ fontSize: 13, color: "var(--ink-3)" }}>%</span>
+                <button className="btn-link" onClick={() => setTargets(targets.filter((_, j) => j !== i))}>
+                  remove
+                </button>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t pt-4">
-            <span className="text-sm text-mut">Total</span>
-            <span
-              className="tnum text-lg font-semibold"
-              style={{
-                color:
-                  Math.abs(totalWeight - 1) < 1e-6 ? "var(--color-buy)" : "var(--color-sell)",
-              }}
-            >
-              {pct(totalWeight * 100, 2)}
-            </span>
-          </div>
-
           {!validation.ok && (
-            <ul className="mt-3 space-y-1 text-xs" style={{ color: "var(--color-sell)" }}>
+            <ul style={{ margin: "14px 0 0", paddingLeft: 18, fontSize: 12, color: "var(--red)", lineHeight: 1.7 }}>
               {validation.errors.map((e, i) => (
                 <li key={i}>{e}</li>
               ))}
             </ul>
           )}
-        </section>
+        </div>
 
-        <section className="rounded-2xl border bg-panel p-6">
-          <h2 className="font-semibold">Add a category</h2>
-          <p className="mt-1 text-sm text-mut">
-            Type it the way you think about it — &ldquo;L1s&rdquo;, &ldquo;AI tokens&rdquo;,
-            &ldquo;DeFi blue chips&rdquo;. The agent resolves it to tradable symbols and defends the
-            choice. You review and edit before it is saved; once approved it is pinned and never
-            re-resolves on its own.
+        <div className="card card-p">
+          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Add a category</h2>
+          <p style={{ fontSize: 13, color: "var(--ink-2)", margin: "5px 0 0", lineHeight: 1.55, maxWidth: "64ch" }}>
+            Type it the way you think about it. The agent resolves it to tradable symbols and defends
+            the choice — including what it deliberately left out. You edit before it is saved; once
+            approved it is pinned and never re-resolves on its own.
           </p>
 
-          <div className="mt-4 flex gap-2">
-            <input
-              value={phrase}
-              onChange={(e) => setPhrase(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && resolve()}
-              placeholder="AI tokens"
-              className="flex-1 rounded-lg border bg-panel-2 px-3 py-2"
-            />
-            <button
-              onClick={resolve}
-              disabled={resolving || !phrase.trim() || !ctx?.llmAvailable}
-              className="rounded-lg border px-4 py-2 text-sm disabled:opacity-40"
-            >
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <div className="search" style={{ flex: 1 }}>
+              <span style={{ color: "var(--ink-3)", fontSize: 13 }}>⌕</span>
+              <input
+                value={phrase}
+                onChange={(e) => setPhrase(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && resolve()}
+                placeholder="AI tokens, DeFi blue chips, restaking…"
+              />
+            </div>
+            <button className="btn" onClick={resolve} disabled={resolving || !phrase.trim() || !ctx?.llmAvailable}>
               {resolving ? "Resolving…" : "Resolve"}
             </button>
           </div>
           {!ctx?.llmAvailable && (
-            <p className="mt-2 text-xs" style={{ color: "var(--color-accent)" }}>
-              Set ANTHROPIC_API_KEY to enable category resolution. Everything else works without it.
+            <p style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 9 }}>
+              Needs an LLM provider. Everything else works without one.
             </p>
           )}
 
           {pending && (
-            <div className="mt-4 rounded-xl border bg-panel-2 p-4">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{pending.phrase}</span>
-                <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-mut">
+            <div style={{ marginTop: 16, padding: 18, borderRadius: "var(--r-inner)", background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 700, fontSize: 14.5 }}>{pending.phrase}</span>
+                <span className={`pill ${pending.res.confidence === "high" ? "pill-green" : "pill-quiet"}`} style={{ padding: "3px 10px", fontSize: 11 }}>
                   {pending.res.confidence} confidence
                 </span>
               </div>
-              <p className="mt-2 text-sm text-mut">{pending.res.rationale}</p>
+              <p style={{ fontSize: 13, color: "var(--ink-2)", margin: "9px 0 0", lineHeight: 1.55 }}>
+                {pending.res.rationale}
+              </p>
 
-              {pending.res.members.length > 0 && (
-                <div className="mt-3 space-y-1.5">
-                  {pending.res.members.map((m, i) => (
-                    <div key={m.symbol} className="flex items-center gap-3 text-sm">
-                      <span className="w-16 font-medium">{m.symbol}</span>
-                      <input
-                        type="number"
-                        value={Number((m.weight * 100).toFixed(1))}
-                        onChange={(e) => {
-                          const members = [...pending.res.members];
-                          members[i] = { ...members[i], weight: Number(e.target.value) / 100 };
-                          setPending({ ...pending, res: { ...pending.res, members } });
-                        }}
-                        className="tnum w-16 rounded border bg-panel px-2 py-1 text-right"
-                      />
-                      <span className="text-mut">%</span>
-                      <span className="flex-1 text-xs text-mut">{m.why}</span>
-                      <button
-                        onClick={() =>
-                          setPending({
-                            ...pending,
-                            res: {
-                              ...pending.res,
-                              members: pending.res.members.filter((_, j) => j !== i),
-                            },
-                          })
-                        }
-                        className="text-xs text-mut"
-                      >
-                        remove
-                      </button>
-                    </div>
-                  ))}
+              {pending.res.members.map((m, i) => (
+                <div key={m.symbol} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 9, fontSize: 13 }}>
+                  <span style={{ fontWeight: 650, width: 58 }}>{m.symbol}</span>
+                  <input
+                    type="number"
+                    value={Number((m.weight * 100).toFixed(1))}
+                    onChange={(e) => {
+                      const members = [...pending.res.members];
+                      members[i] = { ...members[i], weight: Number(e.target.value) / 100 };
+                      setPending({ ...pending, res: { ...pending.res, members } });
+                    }}
+                    className="m"
+                    style={{ width: 58, padding: "5px 8px", textAlign: "right", borderRadius: 9, border: "1px solid var(--line-2)", background: "var(--surface)", outline: "none" }}
+                  />
+                  <span style={{ color: "var(--ink-3)" }}>%</span>
+                  <span style={{ flex: 1, fontSize: 12, color: "var(--ink-2)" }}>{m.why}</span>
+                  <button
+                    className="btn-link"
+                    onClick={() =>
+                      setPending({ ...pending, res: { ...pending.res, members: pending.res.members.filter((_, j) => j !== i) } })
+                    }
+                  >
+                    remove
+                  </button>
                 </div>
-              )}
+              ))}
 
               {pending.res.excluded.length > 0 && (
-                <div className="mt-3 border-t pt-3 text-xs text-mut">
-                  <span className="font-medium">Deliberately excluded: </span>
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)", fontSize: 12, color: "var(--ink-2)", lineHeight: 1.6 }}>
+                  <span style={{ fontWeight: 650 }}>Deliberately excluded: </span>
                   {pending.res.excluded.map((e) => `${e.symbol} (${e.why})`).join(" · ")}
                 </div>
               )}
 
-              <div className="mt-4 flex gap-2">
+              <div style={{ display: "flex", gap: 10, marginTop: 15 }}>
                 <button
-                  onClick={acceptBasket}
+                  className="btn btn-primary"
                   disabled={pending.res.members.length === 0}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                  style={{ background: "var(--color-accent)", color: "var(--color-ink)" }}
+                  onClick={() => {
+                    setTargets([
+                      ...targets,
+                      {
+                        kind: "basket",
+                        label: pending.phrase,
+                        weight: 0,
+                        members: pending.res.members,
+                        resolvedAt: new Date().toISOString(),
+                        rationale: pending.res.rationale,
+                      },
+                    ]);
+                    setPending(null);
+                    setPhrase("");
+                  }}
                 >
-                  Add basket at 0% — set its weight above
+                  Add basket — then set its weight
                 </button>
-                <button onClick={() => setPending(null)} className="rounded-lg border px-4 py-2 text-sm">
+                <button className="btn" onClick={() => setPending(null)}>
                   Discard
                 </button>
               </div>
             </div>
           )}
-        </section>
+        </div>
       </div>
 
-      <div className="space-y-6">
-        <section className="rounded-2xl border bg-panel p-6">
-          <h2 className="font-semibold">How closely to track</h2>
-          <div className="mt-3 space-y-2">
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="card card-p">
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>How closely to track</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
             {(["patient", "balanced", "tight"] as Preference[]).map((p) => (
               <button
                 key={p}
                 onClick={() => props.setPreference(p)}
-                className="w-full rounded-lg border px-3 py-2 text-left text-sm capitalize"
+                className="btn"
                 style={{
-                  background: props.preference === p ? "var(--color-panel-2)" : "transparent",
+                  justifyContent: "flex-start",
+                  borderRadius: "var(--r-sm)",
+                  background: props.preference === p ? "var(--ink)" : "var(--surface)",
+                  color: props.preference === p ? "var(--surface)" : "var(--ink)",
+                  borderColor: props.preference === p ? "var(--ink)" : "var(--line-2)",
+                  textAlign: "left",
                 }}
               >
-                {p}
-                <span className="ml-2 text-xs text-mut">
-                  {p === "patient"
-                    ? "act rarely, weight cost heavily"
-                    : p === "tight"
-                      ? "track closely, accept higher cost"
-                      : "the default trade-off"}
+                <span style={{ fontWeight: 700, textTransform: "capitalize", minWidth: 62 }}>{p}</span>
+                <span style={{ fontSize: 11.5, opacity: 0.75, fontWeight: 500 }}>
+                  {p === "patient" ? "act rarely, weight cost heavily" : p === "tight" ? "track closely, accept higher cost" : "the default trade-off"}
                 </span>
               </button>
             ))}
           </div>
-        </section>
+        </div>
 
-        <section className="rounded-2xl border bg-panel p-6">
-          <h2 className="font-semibold">Data source</h2>
-          <div className="mt-3 space-y-2 text-sm">
-            <button
-              onClick={() => props.setSource("replay")}
+        <div className="card card-p">
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Data source</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
+            <SourceBtn
+              on={props.source === "replay"}
               disabled={!ctx?.replay}
-              className="w-full rounded-lg border px-3 py-2 text-left disabled:opacity-40"
-              style={{ background: props.source === "replay" ? "var(--color-panel-2)" : "transparent" }}
-            >
-              Replay
-              <span className="ml-2 text-xs text-mut">
-                {ctx?.replay
-                  ? `${ctx.replay.symbols.join(", ")} · ${ctx.replay.bars} bars`
-                  : "no dataset — run npm run klines"}
-              </span>
-            </button>
-            <button
+              onClick={() => props.setSource("replay")}
+              title="Replay"
+              note={ctx?.replay ? `${ctx.replay.symbols.join(", ")} · ${ctx.replay.bars} bars` : "no dataset — npm run klines"}
+            />
+            <SourceBtn
+              on={props.source === "public"}
               onClick={() => props.setSource("public")}
-              className="w-full rounded-lg border px-3 py-2 text-left"
-              style={{ background: props.source === "public" ? "var(--color-panel-2)" : "transparent" }}
-            >
-              Live public market data
-              <span className="ml-2 text-xs text-mut">real depth; enter holdings yourself</span>
-            </button>
+              title="Live public market data"
+              note="real depth; enter holdings yourself"
+            />
           </div>
 
           {props.source === "replay" && ctx?.replay && (
-            <div className="mt-4 space-y-3 border-t pt-4">
-              <label className="block text-xs text-mut">
-                Bought the target allocation at bar {props.seedBar}
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max(0, ctx.replay.bars - 2)}
-                  value={props.seedBar}
-                  onChange={(e) => props.setSeedBar(Number(e.target.value))}
-                  className="mt-1 w-full"
-                />
-              </label>
-              <label className="block text-xs text-mut">
-                Reviewing at bar {props.bar} ({Math.round((props.bar - props.seedBar) / 24)} days
-                later)
-                <input
-                  type="range"
-                  min={0}
-                  max={ctx.replay.bars - 1}
-                  value={props.bar}
-                  onChange={(e) => props.setBar(Number(e.target.value))}
-                  className="mt-1 w-full"
-                />
-              </label>
-              <p className="text-[11px] leading-relaxed text-mut">
-                The portfolio is bought on target and then left alone. Drift is produced by the
-                market moving under it — exactly as it would in life.
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 12 }}>
+              <Slider label={`Bought on target at bar ${props.seedBar}`} max={Math.max(0, ctx.replay.bars - 2)} value={props.seedBar} onChange={props.setSeedBar} />
+              <Slider
+                label={`Reviewing at bar ${props.bar} · ${Math.round((props.bar - props.seedBar) / 24)} days later`}
+                max={ctx.replay.bars - 1}
+                value={props.bar}
+                onChange={props.setBar}
+              />
+              <p style={{ fontSize: 11.5, color: "var(--ink-3)", margin: 0, lineHeight: 1.6 }}>
+                Bought on target, then left alone. Drift comes from the market moving under it.
+                Bar 393 is a captured HOLD.
               </p>
             </div>
           )}
 
           {props.source === "public" && (
-            <div className="mt-4 space-y-2 border-t pt-4">
-              <div className="text-xs text-mut">
-                Your holdings. The MCP account scope would read these; without it, enter them here.
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+              <div className="lbl" style={{ marginBottom: 9 }}>
+                Your holdings
               </div>
               {props.holdings.map((h, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} style={{ display: "flex", gap: 7, marginBottom: 7 }}>
                   <input
                     value={h.symbol}
                     onChange={(e) => {
                       const next = [...props.holdings];
-                      next[i] = { ...next[i], symbol: e.target.value };
+                      next[i] = { ...next[i], symbol: e.target.value.toUpperCase() };
                       props.setHoldings(next);
                     }}
-                    className="w-20 rounded border bg-panel-2 px-2 py-1 text-sm uppercase"
+                    style={{ width: 72, padding: "6px 9px", borderRadius: 9, border: "1px solid var(--line-2)", background: "var(--surface-2)", fontSize: 12.5, fontWeight: 600, outline: "none" }}
                   />
                   <input
                     value={h.qty}
@@ -583,35 +590,69 @@ function AllocateScreen(props: {
                       next[i] = { ...next[i], qty: e.target.value };
                       props.setHoldings(next);
                     }}
-                    className="tnum flex-1 rounded border bg-panel-2 px-2 py-1 text-right text-sm"
+                    className="m"
+                    style={{ flex: 1, padding: "6px 9px", textAlign: "right", borderRadius: 9, border: "1px solid var(--line-2)", background: "var(--surface-2)", fontSize: 12.5, outline: "none" }}
                   />
-                  <button
-                    onClick={() => props.setHoldings(props.holdings.filter((_, j) => j !== i))}
-                    className="text-xs text-mut"
-                  >
-                    ×
+                  <button className="btn-link" onClick={() => props.setHoldings(props.holdings.filter((_, j) => j !== i))}>
+                    ✕
                   </button>
                 </div>
               ))}
-              <button
-                onClick={() => props.setHoldings([...props.holdings, { symbol: "", qty: "0" }])}
-                className="w-full rounded-lg border px-3 py-1.5 text-xs"
-              >
+              <button className="btn" style={{ width: "100%", padding: "7px 0", fontSize: 12 }} onClick={() => props.setHoldings([...props.holdings, { symbol: "", qty: "0" }])}>
                 Add holding
               </button>
             </div>
           )}
-        </section>
+        </div>
 
         <button
+          className="btn btn-primary"
+          style={{ width: "100%", padding: "15px 0", fontSize: 14.5 }}
           onClick={props.onReview}
           disabled={props.busy || !validation.ok}
-          className="w-full rounded-xl px-5 py-3 font-semibold disabled:opacity-40"
-          style={{ background: "var(--color-accent)", color: "var(--color-ink)" }}
+          title={validation.ok ? undefined : validation.errors.join(" ")}
         >
           {props.busy ? "Reviewing…" : "Review my portfolio"}
         </button>
+        {!validation.ok && (
+          <p style={{ fontSize: 11.5, color: "var(--amber)", margin: "-8px 0 0", textAlign: "center" }}>
+            Weights must total 100% before the agent can review.
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+function SourceBtn({ on, disabled, onClick, title, note }: { on: boolean; disabled?: boolean; onClick: () => void; title: string; note: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="btn"
+      style={{
+        justifyContent: "flex-start",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 3,
+        borderRadius: "var(--r-sm)",
+        padding: "10px 14px",
+        background: on ? "var(--ink)" : "var(--surface)",
+        color: on ? "var(--surface)" : "var(--ink)",
+        borderColor: on ? "var(--ink)" : "var(--line-2)",
+      }}
+    >
+      <span style={{ fontWeight: 700, fontSize: 13 }}>{title}</span>
+      <span style={{ fontSize: 11, opacity: 0.75, fontWeight: 500 }}>{note}</span>
+    </button>
+  );
+}
+
+function Slider({ label, max, value, onChange }: { label: string; max: number; value: number; onChange: (n: number) => void }) {
+  return (
+    <label style={{ display: "block", fontSize: 11.5, color: "var(--ink-2)" }}>
+      {label}
+      <input type="range" min={0} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ width: "100%", marginTop: 6, accentColor: "var(--ink)" }} />
+    </label>
   );
 }

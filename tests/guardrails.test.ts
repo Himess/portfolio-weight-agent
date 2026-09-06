@@ -142,3 +142,19 @@ describe("narrative guardrails — figures are substituted, never retyped", () =
     expect(unknown).toEqual(["NOPE"]);
   });
 });
+
+describe("narrative formatting", () => {
+  it("preserves the blank line between headline and body", () => {
+    // The UI splits on "\n\n"; collapsing it with a generic \s rule ran the
+    // headline into the body on screen.
+    const { out } = substitute("Holding steady\n\nDrift sits at {{D}}.", { D: "4.9pp" });
+    expect(out.split("\n\n")).toHaveLength(2);
+    expect(out.split("\n\n")[0]).toBe("Holding steady");
+    expect(out.split("\n\n")[1]).toBe("Drift sits at 4.9pp.");
+  });
+
+  it("still collapses runs of spaces left by a removed placeholder", () => {
+    const { out } = substitute("a  b", {});
+    expect(out).toBe("a b");
+  });
+});

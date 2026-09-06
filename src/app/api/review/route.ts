@@ -89,7 +89,25 @@ export async function POST(req: Request) {
       daysSinceLastRebalance: body.daysSinceLastRebalance ?? null,
     });
 
-    return NextResponse.json({ proposal, status: statusFor(source), quantities });
+    // Real hourly closes for the sparklines. Never synthesised: a made-up
+    // series on screen would be a number the user cannot trust (DESIGN.md §2).
+    const symbols = proposal.context.portfolio.rows
+      .map((r) => r.symbol)
+      .filter((sym) => sym !== body.allocation.cashSymbol);
+
+    const series: Record<string, number[]> = {};
+    await Promise.all(
+      symbols.map(async (sym) => {
+        try {
+          const kl = await market.getKlines(sym, "1h", 48);
+          if (kl.length >= 3) series[sym] = kl.map((k) => k.close);
+        } catch {
+          /* a missing sparkline is fine; an invented one is not */
+        }
+      }),
+    );
+
+    return NextResponse.json({ proposal, status: statusFor(source), quantities, series });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Review failed." },

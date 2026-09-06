@@ -1,53 +1,30 @@
 @import "tailwindcss";
+@import "./tokens.css";
 
-@theme {
-  --color-ink: #0b0d10;
-  --color-panel: #14171c;
-  --color-panel-2: #1b1f26;
-  --color-line: #262c35;
-  --color-mut: #8b95a5;
-  --color-fg: #e8ecf2;
-  --color-accent: #f0b90b; /* Binance yellow */
-  --color-buy: #2ebd85;
-  --color-sell: #f6465d;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-}
-
-html,
-body {
-  background: var(--color-ink);
-  color: var(--color-fg);
-  font-family: var(--font-sans);
-}
-
-* {
-  border-color: var(--color-line);
+/* Tailwind reads the design tokens so utilities and hand-written CSS agree. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-amber: var(--amber);
+  --font-display: var(--display);
+  --font-mono: var(--mono);
 }
 
-.tnum {
-  font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono);
-}
-
-/* The drift bar: target is a fixed tick, current is a filled span. */
-.driftbar {
-  position: relative;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--color-panel-2);
-  overflow: visible;
-}
-.driftbar__fill {
-  position: absolute;
-  inset-block: 0;
-  border-radius: 999px;
-}
-.driftbar__target {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  width: 2px;
-  background: var(--color-fg);
-  opacity: 0.9;
+/* Tailwind's preflight resets borders to currentColor; keep the token default. */
+*,
+::before,
+::after {
+  border-color: var(--line);
 }

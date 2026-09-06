@@ -110,7 +110,9 @@ export function substitute(text: string, tokens: Record<string, string>): { out:
     }
     return v;
   });
-  return { out: out.replace(/\s{2,}/g, " ").trim(), unknown };
+  // Collapse runs of spaces/tabs only. \s would also eat the blank line that
+  // separates the headline from the body, which the UI splits on.
+  return { out: out.replace(/[ \t]{2,}/g, " ").trim(), unknown };
 }
 
 export async function writeNarrative(

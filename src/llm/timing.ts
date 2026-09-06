@@ -58,7 +58,14 @@ assetsToActOn — even when its own drift is large. Holding too much or too litt
 cash is corrected by buying or selling the other positions.
 
 Write reasoning in 2-4 sentences, addressed to the portfolio owner, plainly,
-with no hedging boilerplate.`;
+with no hedging boilerplate.
+
+The reasoning is shown to the owner verbatim, so write it in their language, not
+in the language of the input. Never name a field from the JSON you were given —
+no "moveInProgress", "volRatio", "costPerPpUsd", "outsideBand", no "set to true".
+Say what the figures mean instead: "the move is still running", "it is twice as
+volatile as usual", "the correction costs more than the drift it removes", "it
+has crossed its tolerance".`;
 
 /**
  * Deterministic default used whenever the model is unavailable or its answer

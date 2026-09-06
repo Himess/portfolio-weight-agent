@@ -1,125 +1,182 @@
 "use client";
 
-/** Screen 2 — Portfolio view (DESIGN.md §10). The screenshot-worthy one. */
+/**
+ * Screen 2 — Portfolio (DESIGN.md §10). The one that gets screenshotted.
+ *
+ * Hierarchy is deliberate: total drift is the largest thing on the page,
+ * because it is the number that decides whether anything happens at all.
+ * NAV is secondary. Everything else is a supporting row.
+ */
 
+import { Dev, Ring, Sparkline, Swatch } from "./ui";
 import { pct, pp, ppAbs, usd } from "@/lib/format";
 import type { PortfolioState } from "@/types";
 
 export function Portfolio({
   state,
   cashSymbol,
+  series,
 }: {
   state: PortfolioState;
   cashSymbol: string;
+  /** Real hourly closes per symbol. Missing keys simply render no sparkline. */
+  series?: Record<string, number[]>;
 }) {
   const rows = state.rows.filter((r) => r.targetWeight > 0 || r.currentValueUsd > 0);
-  const maxWeight = Math.max(0.01, ...rows.map((r) => Math.max(r.targetWeight, r.currentWeight)));
+  // Ring shows the target allocation, ordered largest first so the ramp reads.
+  const slices = [...rows]
+    .filter((r) => r.targetWeight > 0)
+    .sort((a, b) => b.targetWeight - a.targetWeight)
+    .map((r) => ({ label: r.symbol, pct: r.targetWeight * 100 }));
+  const ringIndex = new Map(slices.map((s, i) => [s.label, i]));
+
+  const outside = rows.filter((r) => r.outsideBand && r.symbol !== cashSymbol);
 
   return (
-    <div className="rounded-2xl border bg-panel">
-      <div className="flex flex-wrap items-end justify-between gap-6 border-b p-6">
-        <div>
-          <div className="text-xs uppercase tracking-widest text-mut">Total drift</div>
-          <div className="mt-1 flex items-baseline gap-3">
-            <span className="tnum text-5xl font-semibold tabular-nums">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* ---- headline ---- */}
+      <div className="card" style={{ padding: "26px 28px", display: "flex", flexWrap: "wrap", gap: 32, alignItems: "center" }}>
+        <div style={{ flex: "1 1 320px", minWidth: 260 }}>
+          <div className="lbl">Total drift</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginTop: 6 }}>
+            <span
+              className="m"
+              style={{
+                fontSize: 68,
+                fontWeight: 700,
+                letterSpacing: "-0.045em",
+                lineHeight: 0.95,
+                color: outside.length > 0 ? "var(--ink)" : "var(--ink-3)",
+              }}
+            >
               {ppAbs(state.totalDriftPp)}
             </span>
-            <span className="text-sm text-mut">of the portfolio must change hands</span>
+          </div>
+          <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "12px 0 0", maxWidth: "44ch", lineHeight: 1.55 }}>
+            {outside.length > 0 ? (
+              <>
+                of the portfolio is away from target.{" "}
+                <strong style={{ fontWeight: 600, color: "var(--ink)" }}>
+                  {outside.map((r) => r.symbol).join(", ")}
+                </strong>{" "}
+                {outside.length === 1 ? "has" : "have"} crossed the tolerance band.
+              </>
+            ) : (
+              <>of the portfolio is away from target — every position is still inside its band.</>
+            )}
+          </p>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
+          <Ring slices={slices} totalPct={slices.reduce((a, s) => a + s.pct, 0)} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {slices.map((s, i) => (
+              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                <Swatch i={i} />
+                <span style={{ fontWeight: 600, minWidth: 44 }}>{s.label}</span>
+                <span className="m" style={{ color: "var(--ink-3)" }}>
+                  {pct(s.pct, 0)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-xs uppercase tracking-widest text-mut">Net asset value</div>
-          <div className="tnum mt-1 text-3xl font-semibold">{usd(state.navUsd)}</div>
-          <div className="mt-1 text-xs text-mut">{new Date(state.asOf).toUTCString()}</div>
+
+        <div style={{ borderLeft: "1px solid var(--line)", paddingLeft: 24, minWidth: 150 }}>
+          <div className="lbl">Net asset value</div>
+          <div className="m" style={{ fontSize: 26, fontWeight: 600, marginTop: 5, letterSpacing: "-0.02em" }}>
+            {usd(state.navUsd)}
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 6 }}>
+            {new Date(state.asOf).toUTCString().replace("GMT", "UTC")}
+          </div>
         </div>
       </div>
 
-      <div className="divide-y">
+      {/* ---- positions ---- */}
+      <div className="card">
+        <div
+          style={{ padding: "13px 22px", borderBottom: "1px solid var(--line)", gap: 16, gridTemplateColumns: "1.35fr 0.9fr 1.5fr 0.85fr 1fr" }}
+          className="lbl poshead"
+        >
+          <span>Position</span>
+          <span>Target / now</span>
+          <span>Deviation from target</span>
+          <span style={{ textAlign: "right" }}>Drift</span>
+          <span style={{ textAlign: "right" }}>To return to target</span>
+        </div>
+
         {rows.map((r) => {
-          const targetPct = (r.targetWeight / maxWeight) * 100;
-          const currentPct = (r.currentWeight / maxWeight) * 100;
-          const over = r.driftPp > 0;
+          const isCash = r.symbol === cashSymbol;
+          const i = ringIndex.get(r.symbol);
+          const closes = series?.[r.symbol] ?? [];
           return (
-            <div key={r.symbol} className="grid grid-cols-12 items-center gap-4 px-6 py-4">
-              <div className="col-span-2">
-                <div className="font-semibold">{r.symbol}</div>
-                <div className="text-xs text-mut">
-                  {r.symbol === cashSymbol ? "cash" : usd(r.currentValueUsd, { compact: true })}
+            <div
+              key={r.symbol}
+              className="posrow"
+              style={{ padding: "14px 22px", borderBottom: "1px solid var(--line)" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                {i != null ? <Swatch i={i} /> : <span style={{ width: 9 }} />}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 650, fontSize: 14 }}>{r.symbol}</div>
+                  <div className="m" style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 2 }}>
+                    {isCash ? "cash" : usd(r.currentValueUsd, { compact: true })}
+                  </div>
+                </div>
+                {!isCash && <Sparkline closes={closes} />}
+              </div>
+
+              <div className="m" style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+                {pct(r.targetWeight * 100)} <span style={{ color: "var(--ink-3)" }}>/</span>{" "}
+                <span style={{ color: "var(--ink)", fontWeight: 600 }}>{pct(r.currentWeight * 100)}</span>
+              </div>
+
+              <div>
+                <Dev driftPp={r.driftPp} bandPp={r.bandPp} />
+                <div className="lbl" style={{ marginTop: 1 }}>
+                  tolerance ±{r.bandPp.toFixed(1)}pp
                 </div>
               </div>
 
-              <div className="col-span-6">
-                <div className="driftbar">
-                  <div
-                    className="driftbar__fill"
-                    style={{
-                      width: `${Math.min(100, currentPct)}%`,
-                      background: r.outsideBand
-                        ? over
-                          ? "var(--color-sell)"
-                          : "var(--color-buy)"
-                        : "var(--color-line)",
-                    }}
-                  />
-                  <div className="driftbar__target" style={{ left: `${Math.min(100, targetPct)}%` }} />
-                </div>
-                <div className="mt-1.5 flex gap-4 text-[11px] text-mut">
-                  <span>target {pct(r.targetWeight * 100)}</span>
-                  <span>now {pct(r.currentWeight * 100)}</span>
-                  <span>band ±{r.bandPp.toFixed(1)}pp</span>
-                </div>
-              </div>
-
-              <div className="col-span-2 text-right">
+              <div style={{ textAlign: "right" }}>
                 <div
-                  className="tnum text-lg font-medium"
+                  className="m"
                   style={{
-                    color: r.outsideBand
-                      ? over
-                        ? "var(--color-sell)"
-                        : "var(--color-buy)"
-                      : "var(--color-mut)",
+                    fontSize: 15,
+                    fontWeight: 650,
+                    color: r.outsideBand ? (r.driftPp > 0 ? "var(--red)" : "var(--green)") : "var(--ink-3)",
                   }}
                 >
                   {pp(r.driftPp)}
                 </div>
-                <div className="text-[11px] text-mut">
-                  {r.outsideBand ? "outside band" : "within band"}
-                </div>
+                {r.outsideBand && (
+                  <span className={`pill ${r.driftPp > 0 ? "pill-red" : "pill-green"}`} style={{ marginTop: 5, padding: "3px 9px", fontSize: 10.5 }}>
+                    outside band
+                  </span>
+                )}
               </div>
 
-              <div className="col-span-2 text-right">
-                {r.symbol === cashSymbol ? (
-                  <>
-                    {/* Cash is never traded against itself — its drift is
-                        resolved by the other legs, so "sell $X of USDT" would
-                        be nonsense. Say what actually happens instead. */}
-                    <div className="tnum text-sm">
-                      {r.deltaUsd > 0 ? "raise " : "deploy "}
-                      {usd(Math.abs(r.deltaUsd), { compact: true })}
-                    </div>
-                    <div className="text-[11px] text-mut">via the other legs</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="tnum text-sm">
-                      {r.deltaUsd > 0 ? "buy " : "sell "}
-                      {usd(Math.abs(r.deltaUsd), { compact: true })}
-                    </div>
-                    <div className="text-[11px] text-mut">to return to target</div>
-                  </>
-                )}
+              <div style={{ textAlign: "right" }}>
+                <div className="m" style={{ fontSize: 13, fontWeight: 600 }}>
+                  {isCash
+                    ? `${r.deltaUsd > 0 ? "raise" : "deploy"} ${usd(Math.abs(r.deltaUsd), { compact: true })}`
+                    : `${r.deltaUsd > 0 ? "buy" : "sell"} ${usd(Math.abs(r.deltaUsd), { compact: true })}`}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3 }}>
+                  {isCash ? "via the other legs" : "at current price"}
+                </div>
               </div>
             </div>
           );
         })}
-      </div>
 
-      <p className="border-t px-6 py-3 text-xs text-mut">
-        Total drift is half the sum of absolute drifts — over- and under-weights always mirror each
-        other, so halving gives the share that actually changes hands. Bands are per position:
-        max(2.0pp, 25% of the target weight).
-      </p>
+        <p style={{ fontSize: 11.5, color: "var(--ink-3)", padding: "13px 22px", margin: 0, lineHeight: 1.6 }}>
+          Total drift is half the sum of absolute drifts — over- and under-weights mirror each other,
+          so halving gives the share that actually changes hands. Bands are per position:
+          max(2.0pp, 25% of the target weight), so a large holding tolerates more drift than a small one.
+        </p>
+      </div>
     </div>
   );
 }

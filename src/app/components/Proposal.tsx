@@ -1,21 +1,24 @@
 "use client";
 
 /**
- * Screen 3 — Proposal, and Screen 4 — Confirmation handoff (DESIGN.md §10).
+ * Screen 3 — Proposal, including the HOLD state, and Screen 4 — Handoff.
  *
- * "The HOLD state needs its own visual treatment — it is a feature, not an
- *  empty state. Make it look like a decision, not like nothing happened."
+ * The HOLD state gets its own layout rather than an empty-state message. The
+ * centrepiece is the trade that was prepared and refused, shown struck through:
+ * the band was breached, the order was sized and priced, a rule would have
+ * fired — and the agent declined. That contrast is the product.
  */
 
 import { useState } from "react";
 
-import { bps, ppAbs, qty, usd } from "@/lib/format";
+import { Say, Stat, N } from "./ui";
+import { bps, pct, ppAbs, qty, usd } from "@/lib/format";
 import type { Proposal as ProposalType } from "@/types";
 
-const FACTOR_LABEL: Record<string, string> = {
+const FACTOR: Record<string, string> = {
   cost: "Cost",
   volatility: "Volatility",
-  falling_knife: "Move still in progress",
+  falling_knife: "Move still running",
   drift_magnitude: "Drift size",
   staleness: "Time since last rebalance",
 };
@@ -29,197 +32,323 @@ export function ProposalView({
   onApprove: () => void;
   onDismiss: () => void;
 }) {
-  const { timing, orderedTrades, context } = proposal;
-  const cb = context.costBenefit;
-  const hold = timing.action === "HOLD";
+  const { timing, context } = proposal;
   const [headline, ...rest] = proposal.narrative.split("\n\n");
   const body = rest.join("\n\n");
 
-  const anythingOutside = context.portfolio.rows.some(
+  const outside = context.portfolio.rows.filter(
     (r) => r.outsideBand && r.symbol !== context.cashSymbol,
   );
 
-  const accent = hold
-    ? anythingOutside
-      ? "var(--color-accent)"
-      : "var(--color-mut)"
-    : "var(--color-buy)";
+  if (timing.action === "HOLD") {
+    return (
+      <Hold
+        proposal={proposal}
+        headline={headline}
+        body={body}
+        anythingOutside={outside.length > 0}
+        onDismiss={onDismiss}
+      />
+    );
+  }
+
+  const cb = context.costBenefit;
 
   return (
-    <div className="rounded-2xl border bg-panel">
-      <div className="border-b p-6" style={{ borderLeft: `3px solid ${accent}` }}>
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className="rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide"
-            style={{ background: accent, color: "var(--color-ink)" }}
-          >
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: "28px 30px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <span className="pill pill-accent" style={{ fontWeight: 700 }}>
             {timing.action}
           </span>
-          <span className="text-xs text-mut">
-            Deciding factor: {FACTOR_LABEL[timing.primaryFactor] ?? timing.primaryFactor}
-          </span>
+          <span className="pill pill-quiet">{FACTOR[timing.primaryFactor] ?? timing.primaryFactor}</span>
           {timing.fellBack && (
-            <span
-              className="rounded-md border px-2 py-0.5 text-[11px] text-mut"
-              title={timing.fallbackReason}
-            >
+            <span className="pill" title={timing.fallbackReason}>
               deterministic fallback — no judgment applied
             </span>
           )}
         </div>
 
-        <h2 className="mt-4 text-2xl font-semibold leading-snug">{headline}</h2>
-        {body && <p className="mt-3 max-w-3xl leading-relaxed text-mut">{body}</p>}
-
-        {hold && anythingOutside && (
-          <p className="mt-4 max-w-3xl rounded-lg border bg-panel-2 p-3 text-sm text-mut">
-            A threshold bot would have traded here — {ppAbs(context.portfolio.totalDriftPp)} of drift
-            is past the band. Choosing not to act is the decision.
-          </p>
-        )}
+        <Say line={headline}>{body}</Say>
       </div>
 
-      {!hold && (
-        <>
-          <div className="grid grid-cols-2 gap-px border-b bg-line md:grid-cols-4">
-            <Stat label="Estimated cost" value={usd(cb.estimatedCostUsd)} sub={bps(cb.costBps)} />
-            <Stat label="Drift removed" value={ppAbs(cb.driftReductionPp)} sub={`to ${ppAbs(cb.totalDriftAfterPp)}`} />
-            <Stat label="Cost per point" value={usd(cb.costPerPpUsd)} sub="per pp corrected" />
-            <Stat label="Legs" value={String(orderedTrades.length)} sub="sells first, then buys" />
-          </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 16 }}>
+        <Tile label="Estimated cost" value={usd(cb.estimatedCostUsd)} note={bps(cb.costBps)} />
+        <Tile label="Drift removed" value={ppAbs(cb.driftReductionPp)} note={`leaves ${ppAbs(cb.totalDriftAfterPp)}`} />
+        <Tile label="Cost per point" value={usd(cb.costPerPpUsd)} note="per pp corrected" />
+        <Tile label="Legs" value={String(proposal.orderedTrades.length)} note="sells first, then buys" />
+      </div>
 
-          <div className="divide-y">
-            {orderedTrades.map((t, i) => (
-              <div key={t.id} className="flex flex-wrap items-center gap-4 px-6 py-4">
-                <span className="tnum w-6 text-sm text-mut">{i + 1}</span>
-                <span
-                  className="w-12 rounded px-2 py-0.5 text-center text-xs font-semibold"
-                  style={{
-                    background: t.side === "BUY" ? "var(--color-buy)" : "var(--color-sell)",
-                    color: "var(--color-ink)",
-                  }}
-                >
-                  {t.side}
-                </span>
-                <span className="tnum min-w-40">
-                  {qty(t.qty)} <span className="font-semibold">{t.symbol}</span>
-                </span>
-                <span className="tnum min-w-24 text-mut">{usd(t.estNotionalUsd)}</span>
-                <span className="min-w-28 text-xs text-mut">{t.method.replace("_", " ")}</span>
-                <span className="tnum min-w-32 text-xs text-mut">
-                  fee {usd(t.estFeeUsd)} · slip {usd(t.estSlippageUsd)}
-                </span>
-                <span className="flex-1 text-xs text-mut">{t.why}</span>
-              </div>
-            ))}
-          </div>
-
-          {proposal.execution?.droppedCandidates.length ? (
-            <div className="border-t px-6 py-3 text-xs text-mut">
-              Dropped:{" "}
-              {proposal.execution.droppedCandidates
-                .map((d) => `${d.candidateId} (${d.why})`)
-                .join(" · ")}
-            </div>
-          ) : null}
-        </>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3 border-t p-6">
-        {!hold && (
-          <button
-            onClick={onApprove}
-            className="rounded-lg px-5 py-2.5 text-sm font-semibold"
-            style={{ background: "var(--color-accent)", color: "var(--color-ink)" }}
+      <div className="card">
+        <div className="lbl" style={{ padding: "13px 22px", borderBottom: "1px solid var(--line)" }}>
+          The plan
+        </div>
+        {proposal.orderedTrades.map((t, i) => (
+          <div
+            key={t.id}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 14,
+              padding: "15px 22px",
+              borderBottom: "1px solid var(--line)",
+            }}
           >
+            <span className="m" style={{ width: 18, color: "var(--ink-3)", fontSize: 12 }}>
+              {i + 1}
+            </span>
+            <span className={`pill ${t.side === "BUY" ? "pill-green" : "pill-red"}`} style={{ fontWeight: 700 }}>
+              {t.side}
+            </span>
+            <div style={{ minWidth: 170 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 650 }}>
+                <span className="m">{qty(t.qty)}</span> {t.symbol}
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3 }}>
+                {t.method.replace("_", " ")} · {t.pair}
+              </div>
+            </div>
+            <div className="m" style={{ fontSize: 14.5, fontWeight: 600, minWidth: 90 }}>
+              {usd(t.estNotionalUsd)}
+            </div>
+            <div className="m" style={{ fontSize: 11.5, color: "var(--ink-3)", minWidth: 150 }}>
+              fee {usd(t.estFeeUsd)} · slip {usd(t.estSlippageUsd)}
+            </div>
+            <div style={{ flex: 1, fontSize: 12.5, color: "var(--ink-2)", minWidth: 180 }}>{t.why}</div>
+          </div>
+        ))}
+
+        {proposal.execution?.droppedCandidates.length ? (
+          <div style={{ padding: "12px 22px", fontSize: 12, color: "var(--ink-3)" }}>
+            Dropped: {proposal.execution.droppedCandidates.map((d) => `${d.candidateId} — ${d.why}`).join(" · ")}
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "18px 22px" }}>
+          <button className="btn btn-primary" onClick={onApprove}>
             Approve — send to Binance
           </button>
-        )}
-        <button onClick={onDismiss} className="rounded-lg border px-5 py-2.5 text-sm">
-          {hold ? "Back to portfolio" : "Dismiss"}
-        </button>
-        <span className="text-xs text-mut">
-          Approving sends each order to Binance, where you confirm it again before it executes.
-        </span>
+          <button className="btn" onClick={onDismiss}>
+            Not now
+          </button>
+          <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
+            Each order is confirmed by you in Binance before it executes.
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Tile({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <div className="bg-panel p-5">
-      <div className="text-[11px] uppercase tracking-widest text-mut">{label}</div>
-      <div className="tnum mt-1 text-2xl font-semibold">{value}</div>
-      <div className="mt-0.5 text-[11px] text-mut">{sub}</div>
+    <div className="card card-p">
+      <div className="lbl">{label}</div>
+      <div className="m" style={{ fontSize: 25, fontWeight: 650, marginTop: 6, letterSpacing: "-0.02em" }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 4 }}>{note}</div>
     </div>
   );
 }
 
-/** Screen 4 — each order handed to Binance for the user's own confirmation. */
-export function Handoff({
+// ---------------------------------------------------------------------------
+// HOLD
+// ---------------------------------------------------------------------------
+
+function Hold({
   proposal,
-  onBack,
+  headline,
+  body,
+  anythingOutside,
+  onDismiss,
 }: {
   proposal: ProposalType;
-  onBack: () => void;
+  headline: string;
+  body: string;
+  anythingOutside: boolean;
+  onDismiss: () => void;
 }) {
-  const [sent, setSent] = useState<number>(-1);
+  const { timing, context } = proposal;
+  const refused = context.candidates;
+  const sig = context.signals;
+
+  const worst = [...context.portfolio.rows]
+    .filter((r) => r.symbol !== context.cashSymbol)
+    .sort((a, b) => Math.abs(b.driftPp) - Math.abs(a.driftPp))[0];
+  const worstSig = sig.find((s) => s.symbol === worst?.symbol);
+
+  const rows: { label: string; value: string; tone?: "green" | "red" | "amber" | "ink" }[] = [];
+  if (worst) {
+    rows.push({
+      label: `${worst.symbol} deviation`,
+      value: `${worst.driftPp > 0 ? "+" : ""}${worst.driftPp.toFixed(1)}pp`,
+      tone: worst.outsideBand ? "red" : "ink",
+    });
+    rows.push({ label: "Its tolerance", value: `${worst.bandPp.toFixed(1)}pp` });
+  }
+  if (worstSig) {
+    rows.push({
+      label: "4-hour move",
+      value: `${worstSig.priceChange4hPct > 0 ? "+" : ""}${worstSig.priceChange4hPct.toFixed(1)}%`,
+      tone: worstSig.priceChange4hPct > 0 ? "green" : "red",
+    });
+    rows.push({
+      label: "24-hour move",
+      value: `${worstSig.priceChange24hPct > 0 ? "+" : ""}${worstSig.priceChange24hPct.toFixed(1)}%`,
+      tone: worstSig.priceChange24hPct > 0 ? "green" : "red",
+    });
+    rows.push({
+      label: "Volatility ratio",
+      value: `${worstSig.volRatio.toFixed(2)}×`,
+      tone: worstSig.volRatio > 1.3 ? "amber" : "ink",
+    });
+  }
+  rows.push({ label: "Cost to correct", value: usd(context.costBenefit.estimatedCostUsd) });
+  rows.push({ label: "Trades refused", value: String(refused.length) });
+
+  return (
+    <div className="split split-hold">
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        <div className="card" style={{ padding: "28px 30px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <span className="pill pill-accent" style={{ fontWeight: 700 }}>
+              HOLD
+            </span>
+            <span className="pill pill-quiet">{FACTOR[timing.primaryFactor] ?? timing.primaryFactor}</span>
+            {timing.fellBack && (
+              <span className="pill" title={timing.fallbackReason}>
+                deterministic fallback — no judgment applied
+              </span>
+            )}
+          </div>
+          <Say line={headline}>{body}</Say>
+        </div>
+
+        {anythingOutside && refused.length > 0 && (
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>What a threshold bot would have done</div>
+            <p style={{ fontSize: 13, color: "var(--ink-2)", margin: "7px 0 15px", maxWidth: "60ch", lineHeight: 1.55 }}>
+              {refused.length === 1 ? "This trade was" : "These trades were"} sized, priced and ready to
+              send. The band was breached, so a rule would have fired. The agent read the same numbers
+              and declined.
+            </p>
+
+            <div className="refused">
+              {refused.map((t, i) => (
+                <div
+                  key={t.id}
+                  className="refused-row"
+                  style={{ marginTop: i === 0 ? 0 : 14 }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div className="strike" style={{ fontSize: 15.5, fontWeight: 650 }}>
+                      {t.side === "SELL" ? "Sell" : "Buy"} <span className="m">{qty(t.qty)}</span> {t.symbol}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 4 }}>
+                      {/* No execution method to report: this candidate never reached
+                          the execution decision, because timing stopped it first. */}
+                      Sized against live depth · {t.slippageBps.toFixed(1)} bps expected slippage
+                    </div>
+                  </div>
+                  <div className="m strike" style={{ fontSize: 15.5, fontWeight: 650 }}>
+                    {usd(t.estNotionalUsd)}
+                  </div>
+                </div>
+              ))}
+              <div className="refused-verdict">
+                <span style={{ fontSize: 11 }}>✕</span>
+                Refused — {timing.reasoning.split(/(?<=\.)\s/)[0]}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button className="btn" onClick={onDismiss}>
+            Check again later
+          </button>
+          <span style={{ fontSize: 12.5, color: "var(--ink-3)" }}>
+            Nothing was sent. Your portfolio is untouched.
+          </span>
+        </div>
+      </div>
+
+      <Stat
+        title="What the agent looked at"
+        note="Every figure computed in code, none written by the model."
+        rows={rows}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Handoff
+// ---------------------------------------------------------------------------
+
+export function Handoff({ proposal, onBack }: { proposal: ProposalType; onBack: () => void }) {
+  const [sent, setSent] = useState(-1);
   const trades = proposal.orderedTrades;
 
   return (
-    <div className="rounded-2xl border bg-panel">
-      <div className="border-b p-6">
-        <h2 className="text-xl font-semibold">Confirmation handoff</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-mut">
-          Orders go to Binance one at a time. Binance surfaces each one for you to confirm before it
-          executes — this app cannot place an order on your behalf, and there is no withdrawal scope
-          in the Binance MCP server, so funds can never leave your account through it.
+    <div className="card">
+      <div style={{ padding: "26px 28px", borderBottom: "1px solid var(--line)" }}>
+        <h2 style={{ fontSize: 21, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
+          Confirmation handoff
+        </h2>
+        <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "10px 0 0", maxWidth: "64ch", lineHeight: 1.6 }}>
+          Orders go to Binance one at a time, and Binance surfaces each one for you to confirm before
+          it executes. This app cannot place an order on your behalf. There is no withdrawal scope in
+          the Binance MCP server, so funds cannot leave your account through it.
         </p>
       </div>
 
-      <div className="divide-y">
-        {trades.map((t, i) => (
-          <div key={t.id} className="flex flex-wrap items-center gap-4 px-6 py-4">
-            <span className="tnum w-6 text-sm text-mut">{i + 1}</span>
-            <span
-              className="w-12 rounded px-2 py-0.5 text-center text-xs font-semibold"
-              style={{
-                background: t.side === "BUY" ? "var(--color-buy)" : "var(--color-sell)",
-                color: "var(--color-ink)",
-              }}
-            >
-              {t.side}
-            </span>
-            <span className="tnum flex-1">
-              {qty(t.qty)} <span className="font-semibold">{t.symbol}</span>{" "}
-              <span className="text-mut">on {t.pair}</span>
-            </span>
-            <span className="tnum text-mut">{usd(t.estNotionalUsd)}</span>
-            {i <= sent ? (
-              <span className="text-xs" style={{ color: "var(--color-accent)" }}>
-                awaiting your confirmation in Binance
-              </span>
-            ) : (
-              <button
-                onClick={() => setSent(i)}
-                disabled={i !== sent + 1}
-                className="rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40"
-              >
-                Send order {i + 1}
-              </button>
-            )}
+      {trades.map((t, i) => (
+        <div
+          key={t.id}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 14,
+            padding: "15px 28px",
+            borderBottom: "1px solid var(--line)",
+          }}
+        >
+          <span className="m" style={{ width: 18, color: "var(--ink-3)", fontSize: 12 }}>
+            {i + 1}
+          </span>
+          <span className={`pill ${t.side === "BUY" ? "pill-green" : "pill-red"}`} style={{ fontWeight: 700 }}>
+            {t.side}
+          </span>
+          <div style={{ flex: 1, fontSize: 14.5, minWidth: 200 }}>
+            <span className="m" style={{ fontWeight: 600 }}>
+              {qty(t.qty)}
+            </span>{" "}
+            {t.symbol} <span style={{ color: "var(--ink-3)" }}>on {t.pair}</span>
           </div>
-        ))}
-      </div>
+          <div className="m" style={{ fontSize: 14, fontWeight: 600 }}>
+            {usd(t.estNotionalUsd)}
+          </div>
+          {i <= sent ? (
+            <span className="pill pill-accent">awaiting your confirmation in Binance</span>
+          ) : (
+            <button className="btn" disabled={i !== sent + 1} onClick={() => setSent(i)} style={{ padding: "8px 14px", fontSize: 12 }}>
+              Send order {i + 1}
+            </button>
+          )}
+        </div>
+      ))}
 
-      <div className="flex items-center gap-3 border-t p-6">
-        <button onClick={onBack} className="rounded-lg border px-5 py-2.5 text-sm">
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "18px 28px" }}>
+        <button className="btn" onClick={onBack}>
           Back
         </button>
-        <span className="text-xs text-mut">
-          Between orders the agent re-checks that the next leg is still valid; if drift has moved
-          materially it stops and re-plans rather than continuing blindly.
+        <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
+          Between orders the agent re-checks the next leg; if drift has moved materially it stops and
+          re-plans rather than continuing blindly.
         </span>
       </div>
     </div>

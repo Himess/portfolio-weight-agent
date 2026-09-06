@@ -1,0 +1,462 @@
+/**
+ * Visual language — extracted from the GhostRail frontend design system
+ * (github.com/Himess/ghostrail, frontend/app/globals.css plus the inline style
+ * strings its components carry).
+ *
+ * These are the actual values in use there, not an interpretation: the palette
+ * and fonts are verbatim, and the surface/pill/meter primitives below are the
+ * recurring inline patterns collapsed into classes (the card shell appears 19
+ * times, `1px solid var(--line)` 57 times, `border-radius:999px` 51 times).
+ *
+ * Warm, light, editorial. No dark theme, no glass, no gradients, no glow.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Surfaces */
+  --bg: #f4f3f1;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
+  --surface-3: #f5f3ec;
+  --panel: #171512;
+
+  /* Ink */
+  --ink: #1a1815;
+  --ink-2: #615d54;
+  --ink-3: #9a958a;
+
+  /* Lines */
+  --line: #eae7df;
+  --line-2: #ddd9cf;
+
+  /* Accent */
+  --accent: #ffd208;
+  --accent-soft: #fff3bd;
+  --accent-line: #f0e08f;
+  --accent-ink: #8a6d00;
+
+  /* Semantic */
+  --green: #1c8f5a;
+  --green-bg: #e7f4ec;
+  --green-line: #bfe3cf;
+  --green-ink: #1c7a4f;
+  --amber: #c68a00;
+  --red: #d13c3c;
+  --red-bg: #fbecec;
+  --red-line: #f0c9c9;
+
+  /* Type */
+  --display: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  /* Radii */
+  --r-card: 20px;
+  --r-inner: 14px;
+  --r-sm: 12px;
+  --r-pill: 999px;
+
+  /* Elevation — deliberately almost flat */
+  --shadow-card: 0 1px 2px rgba(20, 18, 12, 0.03);
+  --shadow-raised: 0 1px 2px rgba(20, 18, 12, 0.04), 0 10px 30px rgba(20, 18, 12, 0.03);
+  --shadow-accent: 0 5px 16px rgba(255, 210, 8, 0.32);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--display);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* --- primitives ---------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+.card-p {
+  padding: 20px 22px;
+}
+
+.card-p-lg {
+  padding: 24px;
+}
+
+/* Numerals: tabular so columns of figures line up and don't jitter on update */
+.m {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase section label */
+.lbl {
+  font: 650 9px var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font: 650 12px var(--display);
+  white-space: nowrap;
+}
+
+.pill-green {
+  background: var(--green-bg);
+  border-color: var(--green-line);
+  color: var(--green-ink);
+}
+
+.pill-accent {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+
+.pill-red {
+  background: var(--red-bg);
+  border-color: var(--red-line);
+  color: var(--red);
+}
+
+.pill-quiet {
+  background: var(--surface-3);
+  border-color: var(--line);
+  font-weight: 600;
+  font-size: 11.5px;
+}
+
+/* --- buttons ------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 13px var(--display);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--ink-3);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: var(--shadow-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #f5c800;
+  border-color: #f5c800;
+}
+
+.btn-primary:disabled {
+  box-shadow: none;
+}
+
+.btn-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--ink-3);
+  font: 500 13px var(--display);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* --- deviation meter (concept from PortfolioAgentUI, restyled) ------------ */
+/* A signed deviation from a centre line, with the tolerance band drawn as a
+   region rather than a number. Reads as "how far outside" at a glance. */
+
+.dev {
+  position: relative;
+  height: 22px;
+  width: 100%;
+}
+
+.dev-band {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  background: var(--surface-3);
+  border-left: 1px solid var(--line-2);
+  border-right: 1px solid var(--line-2);
+  border-radius: 3px;
+}
+
+.dev-axis {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ink-3);
+  opacity: 0.5;
+}
+
+.dev-fill {
+  position: absolute;
+  top: 9px;
+  height: 4px;
+  border-radius: var(--r-pill);
+}
+
+.dev-pin {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+}
+
+/* --- meters -------------------------------------------------------------- */
+
+.meter {
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+}
+
+/* --- token picker rows --------------------------------------------------- */
+
+.tk {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--r-inner);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.tk:hover {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.tk[data-in="1"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+.tk-add {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  color: var(--ink-3);
+  font: 600 13px var(--display);
+}
+
+.tk[data-in="1"] .tk-add {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+/* --- search -------------------------------------------------------------- */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+}
+
+.search input {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font: 500 13px var(--display);
+  color: var(--ink);
+}
+
+.search input::placeholder {
+  color: var(--ink-3);
+}
+
+/* --- chips --------------------------------------------------------------- */
+
+.chip {
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: 600 11.5px var(--display);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip[data-on="1"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
+}
+
+/* --- the "what a bot would have done" block ------------------------------ */
+/* Dashed, faded, struck through: an action that was prepared and refused. */
+
+.refused {
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  padding: 18px 22px;
+}
+
+.refused-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  opacity: 0.45;
+}
+
+.refused-row .strike {
+  text-decoration: line-through;
+}
+
+.refused-verdict {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 600 13px var(--display);
+  color: var(--green);
+}
+
+/* --- misc ---------------------------------------------------------------- */
+
+.hr {
+  height: 1px;
+  background: var(--line);
+  border: none;
+  margin: 0;
+}
+
+.scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- responsive ---------------------------------------------------------- */
+/* The two-column screens (allocate, HOLD) squeeze badly below ~900px: the
+   allocation rows lose their labels and the deviation meters collapse. Stack
+   instead of compressing. */
+
+.split {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .split-main {
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  }
+  .split-hold {
+    grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
+  }
+}
+
+/* Position rows: the five-column grid needs room for the meter to mean anything. */
+.posrow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 1000px) {
+  .posrow {
+    grid-template-columns: 1.35fr 0.9fr 1.5fr 0.85fr 1fr;
+    gap: 16px;
+    align-items: center;
+  }
+}
+
+/* Header row only makes sense once the columns exist. */
+.poshead {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  .poshead {
+    display: grid;
+  }
+}
