@@ -49,9 +49,16 @@ Respect the user's stated preference:
 - balanced — the default trade-off.
 - tight    — track the target closely, accept higher costs to do it.
 
-assetsToActOn must be a subset of the symbols listed as outsideBand. For HOLD it
-must be empty. Write reasoning in 2-4 sentences, addressed to the portfolio
-owner, plainly, with no hedging boilerplate.`;
+assetsToActOn must be a subset of the "outsideBand" list you are given, exactly
+as spelled there. For HOLD it must be empty.
+
+The cash position (see "cashSymbol") is shown for context but is never traded
+directly, so it never appears in outsideBand and must never appear in
+assetsToActOn — even when its own drift is large. Holding too much or too little
+cash is corrected by buying or selling the other positions.
+
+Write reasoning in 2-4 sentences, addressed to the portfolio owner, plainly,
+with no hedging boilerplate.`;
 
 /**
  * Deterministic default used whenever the model is unavailable or its answer
@@ -190,12 +197,19 @@ function buildFacts(ctx: RebalanceContext, outsideBand: string[]) {
     totalDriftPp: round(ctx.portfolio.totalDriftPp, 3),
     daysSinceLastRebalance: ctx.daysSinceLastRebalance,
     outsideBand,
+    cashSymbol: ctx.cashSymbol,
     positions: ctx.portfolio.rows
       .filter((r) => r.symbol !== ctx.cashSymbol || r.targetWeight > 0)
       .map((r) => {
         const s = signalBySymbol.get(r.symbol);
+        const isCash = r.symbol === ctx.cashSymbol;
         return {
           symbol: r.symbol,
+          // Cash is shown because its weight is informative, but it is never
+          // traded against itself — its drift is resolved by the other legs.
+          // Without this flag the model sees cash outside its band and
+          // reasonably proposes acting on it, which the validator then rejects.
+          tradable: !isCash,
           targetWeightPct: round(r.targetWeight * 100, 2),
           currentWeightPct: round(r.currentWeight * 100, 2),
           driftPp: round(r.driftPp, 2),

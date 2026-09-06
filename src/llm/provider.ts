@@ -35,15 +35,35 @@ export type ProviderConfig = {
   baseUrl?: string;
   /** Shown in the UI so it is always clear what produced the judgment */
   label: string;
+  /**
+   * Provider-specific request fields. Kept per-preset because OpenAI-compatible
+   * endpoints agree on the core shape but not the extensions — sending Gemini's
+   * knobs to Groq would be rejected.
+   */
+  extraBody?: Record<string, unknown>;
+};
+
+type Preset = {
+  baseUrl: string;
+  model: string;
+  label: string;
+  envKey: string;
+  extraBody?: Record<string, unknown>;
 };
 
 /** Known OpenAI-compatible endpoints, so the common cases need one env var. */
-const PRESETS: Record<string, { baseUrl: string; model: string; label: string; envKey: string }> = {
+const PRESETS: Record<string, Preset> = {
   gemini: {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     model: "gemini-2.5-flash",
     label: "Gemini (free tier)",
     envKey: "GEMINI_API_KEY",
+    // Gemini 2.5 Flash thinks by default, and that thinking is billed against
+    // max_tokens. Left alone it spends the entire budget reasoning and returns
+    // JSON truncated mid-string (measured: 1918 thinking tokens of a 2000
+    // budget). "low" keeps useful reasoning — this is a judgment call, not an
+    // extraction task — while leaving room for the answer.
+    extraBody: { reasoning_effort: "low" },
   },
   groq: {
     baseUrl: "https://api.groq.com/openai/v1",
@@ -98,6 +118,9 @@ export function resolveProvider(): ProviderConfig {
       apiKey: process.env[p.envKey] ?? process.env.LLM_API_KEY ?? "ollama",
       baseUrl: process.env.LLM_BASE_URL ?? p.baseUrl,
       label: `${p.label} · ${model}`,
+      extraBody: process.env.LLM_REASONING_EFFORT
+        ? { ...p.extraBody, reasoning_effort: process.env.LLM_REASONING_EFFORT }
+        : p.extraBody,
     };
   }
 
@@ -199,6 +222,7 @@ async function callOpenAiCompatible<T>(
   const body = (responseFormat: unknown) => ({
     model: provider.model,
     ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+    ...(provider.extraBody ?? {}),
     max_tokens: opts.maxTokens ?? 2000,
     messages: [
       { role: "system", content: opts.system },
@@ -212,7 +236,7 @@ async function callOpenAiCompatible<T>(
     json_schema: { name: opts.schemaName, schema: jsonSchema, strict: true },
   };
 
-  let text = await post(provider, body(strict));
+  let text = await postWithRetry(provider, body(strict));
 
   // Not every OpenAI-compatible endpoint implements json_schema. Fall back to
   // plain JSON mode with the schema inlined in the prompt — we validate with
@@ -228,10 +252,55 @@ async function callOpenAiCompatible<T>(
         { role: "user", content: JSON.stringify(opts.facts, null, 2) },
       ],
     };
-    text = await post(provider, relaxed, { throwOnError: true });
+    text = await postWithRetry(provider, relaxed, { throwOnError: true });
   }
 
-  return text == null ? null : parseLoose(text);
+  if (text == null) return null;
+  const parsed = parseLoose(text);
+  if (parsed == null) {
+    debug(`content did not parse as JSON (${text.length} chars): ${text.slice(0, 400)}`);
+  }
+  return parsed;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Free tiers are rate-limited by the minute (Gemini: ~15 rpm), and a review
+ * makes several calls in quick succession, so a 429 is an expected condition
+ * rather than an error. Back off and retry instead of degrading the decision.
+ */
+async function postWithRetry(
+  provider: ProviderConfig,
+  body: unknown,
+  opts: { throwOnError?: boolean } = {},
+): Promise<string | null> {
+  const maxAttempts = Number(process.env.LLM_MAX_RETRIES ?? 4);
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await post(provider, body, opts);
+    } catch (err) {
+      const retryAfter = err instanceof RateLimited ? err.retryAfterMs : null;
+      if (retryAfter == null || attempt >= maxAttempts) {
+        if (err instanceof RateLimited) {
+          throw new Error(
+            `${provider.label} rate limit reached after ${attempt} attempts — ` +
+              "wait a minute, or set LLM_MAX_RETRIES higher",
+          );
+        }
+        throw err;
+      }
+      debug(`429 — backing off ${retryAfter}ms (attempt ${attempt}/${maxAttempts})`);
+      await sleep(retryAfter);
+    }
+  }
+}
+
+class RateLimited extends Error {
+  constructor(readonly retryAfterMs: number) {
+    super("rate limited");
+  }
 }
 
 async function post(
@@ -248,18 +317,56 @@ async function post(
     body: JSON.stringify(body),
   });
 
+  if (res.status === 429) {
+    const header = res.headers.get("retry-after");
+    const fromHeader = header ? Number(header) * 1000 : NaN;
+    // Free-tier quotas reset on the minute, so a short retry usually fails
+    // again; default to a full window rather than hammering.
+    throw new RateLimited(Number.isFinite(fromHeader) ? fromHeader : 20_000);
+  }
+
   if (!res.ok) {
     const detail = (await res.text()).slice(0, 300);
     if (opts.throwOnError) {
       throw new Error(`${provider.label} -> HTTP ${res.status}: ${detail}`);
     }
+    debug(`HTTP ${res.status} on strict attempt: ${detail}`);
     return null; // caller retries with the relaxed response format
   }
 
   const json = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
+    choices?: { message?: { content?: string }; finish_reason?: string }[];
+    usage?: Record<string, number>;
   };
-  return json.choices?.[0]?.message?.content ?? null;
+
+  const choice = json.choices?.[0];
+  const content = choice?.message?.content ?? null;
+
+  if (choice?.finish_reason === "length") {
+    // The single most confusing failure: a 200 with syntactically broken JSON
+    // because the budget ran out mid-answer. Name it rather than reporting a
+    // generic parse error.
+    debug(`truncated at max_tokens — usage=${JSON.stringify(json.usage ?? {})}`);
+    throw new Error(
+      "response truncated at max_tokens (the model spent the budget before finishing) — " +
+        "raise maxTokens or lower reasoning effort",
+    );
+  }
+
+  if (!content) {
+    // Empty content with a 200 is the failure mode that is hardest to diagnose
+    // blind: a reasoning model can spend the whole token budget thinking and
+    // return nothing. Surface finish_reason and usage rather than a bare null.
+    debug(
+      `empty content — finish_reason=${choice?.finish_reason ?? "?"} usage=${JSON.stringify(json.usage ?? {})}`,
+    );
+  }
+  return content;
+}
+
+/** Set LLM_DEBUG=1 to trace provider responses when a decision falls back. */
+function debug(msg: string): void {
+  if (process.env.LLM_DEBUG) console.warn(`[llm:debug] ${msg}`);
 }
 
 /**

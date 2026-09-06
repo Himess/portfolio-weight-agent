@@ -37,6 +37,19 @@ function arg(name: string, fallback: string): string {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Free tiers cap requests per minute (Gemini: ~15). Pace the harness so the
+ * measurement reflects prompt quality rather than quota exhaustion.
+ */
+let PACE_MS = 4500;
+async function paced<T>(fn: () => Promise<T>): Promise<T> {
+  const out = await fn();
+  await sleep(PACE_MS);
+  return out;
+}
+
 const ALLOCATION: Allocation = {
   cashSymbol: "USDT",
   targets: [
@@ -130,6 +143,7 @@ async function main() {
   const only = arg("only", "");
   const dataPath = path.resolve(arg("data", "data/window-365d.json"));
   const bar = Number(arg("bar", "8484"));
+  PACE_MS = Number(arg("pace", "4500"));
 
   const provider = resolveProvider();
   console.log(`Provider: ${provider.label}`);
@@ -155,7 +169,7 @@ async function main() {
   if (want("timing")) {
     const t = newTally();
     for (let i = 0; i < n; i++) {
-      const d = await decideTiming(ctx);
+      const d = await paced(() => decideTiming(ctx));
       if (d.fellBack) {
         t.fell++;
         t.reasons.push(d.fallbackReason ?? "unknown");
@@ -170,7 +184,7 @@ async function main() {
   if (want("execution")) {
     const t = newTally();
     for (let i = 0; i < n; i++) {
-      const d = await decideExecution(ctx, ctx.candidates);
+      const d = await paced(() => decideExecution(ctx, ctx.candidates));
       if (d.fellBack) {
         t.fell++;
         t.reasons.push(d.fallbackReason ?? "unknown");
@@ -189,7 +203,7 @@ async function main() {
     const universe = ["BTC", "ETH", "SOL", "AVAX", "BNB", "ADA", "DOT", "NEAR", "APT", "SUI", "TIA", "ATOM", "LINK", "UNI", "AAVE", "RENDER", "FET", "TAO", "INJ", "ARB", "OP", "MATIC", "XRP", "DOGE"];
     const volumes = Object.fromEntries(universe.map((s, i) => [s, 1e9 / (i + 1)]));
     for (let i = 0; i < n; i++) {
-      const d = await resolveBasket({ phrase: "AI tokens", tradable: universe, volumes });
+      const d = await paced(() => resolveBasket({ phrase: "AI tokens", tradable: universe, volumes }));
       if (d.fellBack) {
         t.fell++;
         t.reasons.push(d.fallbackReason ?? "unknown");
@@ -218,7 +232,7 @@ async function main() {
       why: "market",
     }));
     for (let i = 0; i < n; i++) {
-      const out = await writeNarrative(ctx, timing, trades);
+      const out = await paced(() => writeNarrative(ctx, timing, trades));
       // The deterministic template is recognisable by its exact opening clause.
       const isFallback = out.startsWith("Rebalance — ") || out.startsWith("Partial rebalance — ");
       if (isFallback) {
