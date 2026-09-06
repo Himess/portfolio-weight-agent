@@ -98,10 +98,26 @@ and degrades gracefully (showing the plan, unable to send it) if a capability is
 
 ```bash
 npm install
-cp .env.example .env      # optional: add ANTHROPIC_API_KEY for the judgment layer
+cp .env.example .env      # add ANTHROPIC_API_KEY to turn on the judgment layer
+npm run env:check         # confirms the key is actually being loaded
 npm run klines -- --symbols BTC,ETH,SOL,AVAX --days 365 --out data/window-365d.json
 npm run dev
 ```
+
+**Getting the key.** It comes from the Anthropic **Console**
+(<https://console.anthropic.com/settings/keys> → Create Key), which is a separate account from a
+claude.ai Pro/Max subscription — a subscription does not include API access, and the Console account
+needs its own credit. The key looks like `sk-ant-api03-…`.
+
+Put it in `.env` at the repo root:
+
+```
+ANTHROPIC_API_KEY=sk-ant-api03-...
+```
+
+`.env` is gitignored. Next.js loads it automatically; the `tsx` scripts load it via
+`--env-file-if-exists`, which is why `npm run replay` sees the key too. `npm run env:check` prints a
+masked confirmation if you are unsure.
 
 Open http://localhost:3000. Four screens: set allocation → portfolio → proposal → confirmation handoff.
 
