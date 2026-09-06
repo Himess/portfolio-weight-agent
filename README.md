@@ -112,7 +112,7 @@ file that names one. Set **one** key in `.env`:
 
 | Provider | Cost | Key |
 |---|---|---|
-| **Google Gemini** | **free tier, no card** — Flash models, ~15 req/min, ~1500/day | <https://aistudio.google.com/apikey> |
+| **Google Gemini** | **free tier, no card** — see the quota note below | <https://aistudio.google.com/apikey> |
 | Groq | free tier | <https://console.groq.com/keys> |
 | OpenRouter | some models free (`:free` suffix) | <https://openrouter.ai/keys> |
 | Anthropic | paid — what DESIGN.md specifies | <https://console.anthropic.com/settings/keys> |
@@ -125,6 +125,11 @@ OpenAI-compatible backend, so any other compatible endpoint works too.
 > separate account with its own credit. Running the app on a server does not change that: where the
 > code runs does not determine which credentials you are licensed to use.
 
+> **Gemini free-tier quota is per model, per day, and varies a lot.** `gemini-2.5-flash` allows only
+> **20 requests/day** — one validation run exhausts it. The default here is `gemini-flash-lite-latest`,
+> which is the generous tier; the `-latest` alias also survives model retirement (`gemini-2.0-flash`
+> and `gemini-2.5-flash-lite` already 404 on this endpoint). Override with `LLM_MODEL`.
+
 ```bash
 npm run env:check            # which provider resolved, key masked
 npm run llm:check -- --n 10  # 10 calls per decision, reports the schema-pass rate
@@ -135,6 +140,44 @@ zod schema *and* against facts the model does not get to assert; anything that f
 labelled deterministic fallback. A decision falling back more than about once in ten means the prompt
 needs work — that is a prompt problem, not a safety problem, because a bad response can never reach
 an order.
+
+**Measured** — `gemini-flash-lite-latest`, free tier, 10 calls per decision:
+
+| Decision | Schema-pass |
+|---|---|
+| §7.1 timing | 10/10 |
+| §7.2 execution | 10/10 |
+| §7.3 basket resolution | 10/10 |
+| §7.4 narrative | 10/10 |
+
+The narrative result is worth spelling out, because it is the claim most people would assume is
+hand-waving. Raw model output, before substitution:
+
+> Rebalancing AVAX after market drop
+>
+> Your portfolio drifted by `{{TOTAL_DRIFT}}` due to recent market moves. We are buying AVAX while it
+> is down to bring your allocation back in line for `{{EST_COST}}`.
+
+Placeholders emitted: `{{TOTAL_DRIFT}}`, `{{EST_COST}}`. Bare figures typed by the model: **none**.
+
+### The HOLD, captured
+
+`docs/hold-example.json` holds a real HOLD from the judgment layer — not the deterministic fallback,
+which the capture script rejects. Reproduce with `npm run hold:example`.
+
+Replay bar 393 (2025-09-23). AVAX is **+4.9pp against a 3.8pp band**, so a threshold bot trades here.
+The agent did not, and the deterministic facts say why: `volRatio` 1.93, 4h `+3.2%`, 24h `+9.9%` —
+AVAX is overweight *and still climbing*, so correcting now means selling into a move that has not
+finished. One candidate trade, already sized and priced, was declined.
+
+> Holding steady despite drift
+>
+> Your portfolio shows a total drift of 4.9pp led by AVAX currently at 19.9%, but active upward
+> momentum means we are holding off on trades today. Selling into this rapid climb would be
+> premature, so we wait for the price action to settle before acting.
+
+`primaryFactor: falling_knife`. That is the whole product in one screen: a bot cannot say
+"do nothing today", and this can, with its reasons on the table.
 
 `.env` is gitignored. Next.js loads it automatically; the `tsx` scripts load it via
 `--env-file-if-exists`, which is why `npm run replay` and `npm run llm:check` see it too.

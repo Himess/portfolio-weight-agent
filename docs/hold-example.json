@@ -1,0 +1,165 @@
+{
+  "capturedAt": "2026-09-06T18:48:17.806Z",
+  "provider": "Gemini (free tier) · gemini-flash-lite-latest",
+  "note": "A real HOLD from the judgment layer. A threshold rule would have traded here: the position is outside its band. The agent declined and said why.",
+  "replay": {
+    "dataset": "window-365d.json",
+    "bar": 393,
+    "seedBar": 30,
+    "asOf": "2025-09-23T03:59:59.999Z"
+  },
+  "input": {
+    "allocation": {
+      "cashSymbol": "USDT",
+      "targets": [
+        {
+          "kind": "asset",
+          "symbol": "BTC",
+          "weight": 0.4
+        },
+        {
+          "kind": "asset",
+          "symbol": "ETH",
+          "weight": 0.2
+        },
+        {
+          "kind": "basket",
+          "label": "L1s",
+          "weight": 0.3,
+          "members": [
+            {
+              "symbol": "SOL",
+              "weight": 0.5
+            },
+            {
+              "symbol": "AVAX",
+              "weight": 0.5
+            }
+          ],
+          "resolvedAt": "2026-01-01T00:00:00.000Z",
+          "rationale": "Large-cap alternative layer-1s, equally weighted."
+        },
+        {
+          "kind": "asset",
+          "symbol": "USDT",
+          "weight": 0.1
+        }
+      ]
+    },
+    "quantities": {
+      "BTC": 0.3608871906339669,
+      "ETH": 4.652396216671397,
+      "SOL": 72.93591364387825,
+      "AVAX": 608.7662337662338,
+      "USDT": 10000
+    },
+    "portfolio": {
+      "navUsd": 107119.35458002507,
+      "rows": [
+        {
+          "symbol": "AVAX",
+          "targetWeight": 0.15,
+          "currentWeight": 0.1985662842273935,
+          "driftPp": 4.856628422739351,
+          "deltaUsd": -5202.389020788445,
+          "outsideBand": true,
+          "bandPp": 3.75,
+          "targetValueUsd": 16067.90318700376,
+          "currentValueUsd": 21270.292207792205
+        },
+        {
+          "symbol": "BTC",
+          "targetWeight": 0.4,
+          "currentWeight": 0.37847561298234295,
+          "driftPp": -2.152438701765708,
+          "deltaUsd": 2305.678445062098,
+          "outsideBand": false,
+          "bandPp": 10,
+          "targetValueUsd": 42847.74183201003,
+          "currentValueUsd": 40542.063386947935
+        },
+        {
+          "symbol": "ETH",
+          "targetWeight": 0.2,
+          "currentWeight": 0.18189319713297902,
+          "driftPp": -1.8106802867020988,
+          "deltaUsd": 1939.5890366230378,
+          "outsideBand": false,
+          "bandPp": 5,
+          "targetValueUsd": 21423.870916005017,
+          "currentValueUsd": 19484.28187938198
+        },
+        {
+          "symbol": "USDT",
+          "targetWeight": 0.1,
+          "currentWeight": 0.0933538111689177,
+          "driftPp": -0.6646188831082311,
+          "deltaUsd": 711.9354580025083,
+          "outsideBand": false,
+          "bandPp": 2.5,
+          "targetValueUsd": 10711.935458002508,
+          "currentValueUsd": 10000
+        },
+        {
+          "symbol": "SOL",
+          "targetWeight": 0.15,
+          "currentWeight": 0.14771109448836678,
+          "driftPp": -0.22889055116332158,
+          "deltaUsd": 245.18608110081186,
+          "outsideBand": false,
+          "bandPp": 3.75,
+          "targetValueUsd": 16067.90318700376,
+          "currentValueUsd": 15822.717105902948
+        }
+      ],
+      "totalDriftPp": 4.856628422739354,
+      "asOf": "2025-09-23T03:59:59.999Z"
+    },
+    "signals": [
+      {
+        "symbol": "AVAX",
+        "realizedVol24h": 1.8204466555569225,
+        "realizedVol4h": 3.5066851651360755,
+        "volRatio": 1.9262773531055697,
+        "priceChange4hPct": 3.1896042528056654,
+        "priceChange24hPct": 9.874213836477978
+      }
+    ],
+    "candidates": [
+      {
+        "side": "SELL",
+        "symbol": "AVAX",
+        "pair": "AVAXUSDT",
+        "qty": 148.89,
+        "estNotionalUsd": 5201.17615668,
+        "estFeeUsd": 5.20117615668,
+        "estSlippageUsd": 1.040443319999966,
+        "estExecPrice": 34.933,
+        "midPrice": 34.94,
+        "slippageBps": 1.999999999999935,
+        "bookExhausted": false,
+        "id": "t1",
+        "sequenceIndex": 0
+      }
+    ],
+    "costBenefit": {
+      "estimatedCostUsd": 6.241619476679966,
+      "totalDriftBeforePp": 4.856628422739354,
+      "totalDriftAfterPp": 2.4288803388044458,
+      "driftReductionPp": 2.4277480839349086,
+      "costPerPpUsd": 2.5709502225467773,
+      "costBps": 0.5826789660142204
+    },
+    "daysSinceLastRebalance": 15,
+    "preference": "balanced"
+  },
+  "output": {
+    "timing": {
+      "action": "HOLD",
+      "assetsToActOn": [],
+      "reasoning": "AVAX is currently outside its band with a significant drift, but its price is still moving upward rapidly with a high volRatio. Selling into this active upward move would be premature. It is better to hold off until the price action stabilizes.",
+      "primaryFactor": "falling_knife"
+    },
+    "narrative": "Holding steady despite drift Your portfolio shows a total drift of 4.9pp led by AVAX currently at 19.9%, but active upward momentum means we are holding off on trades today. Selling into this rapid climb would be premature, so we wait for the price action to settle before acting."
+  }
+}

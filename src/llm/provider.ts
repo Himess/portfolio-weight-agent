@@ -55,14 +55,20 @@ type Preset = {
 const PRESETS: Record<string, Preset> = {
   gemini: {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    model: "gemini-2.5-flash",
+    // Free-tier quota is per model per day, and it varies a lot between them:
+    // gemini-2.5-flash allows only 20 requests/day, which one validation run
+    // exhausts. The lite tier is the generous one, and the "-latest" alias
+    // keeps working when a specific version is retired (gemini-2.0-flash and
+    // gemini-2.5-flash-lite both now 404 on this endpoint).
+    // Override with LLM_MODEL if you have a paid project.
+    model: "gemini-flash-lite-latest",
     label: "Gemini (free tier)",
     envKey: "GEMINI_API_KEY",
-    // Gemini 2.5 Flash thinks by default, and that thinking is billed against
-    // max_tokens. Left alone it spends the entire budget reasoning and returns
-    // JSON truncated mid-string (measured: 1918 thinking tokens of a 2000
-    // budget). "low" keeps useful reasoning — this is a judgment call, not an
-    // extraction task — while leaving room for the answer.
+    // Gemini's flash models think by default, and that thinking is charged
+    // against max_tokens. Left alone, gemini-2.5-flash spent 1918 tokens of a
+    // 2000 budget reasoning and returned JSON truncated mid-string. "low" keeps
+    // useful reasoning — this is a judgment call, not an extraction task —
+    // while leaving room for the answer.
     extraBody: { reasoning_effort: "low" },
   },
   groq: {
