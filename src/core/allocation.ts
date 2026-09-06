@@ -31,7 +31,9 @@ export function validateAllocation(alloc: Allocation): ValidationResult {
       continue;
     }
     if (t.weight === 0) {
-      errors.push(`Target ${describe(t)} has zero weight — remove it instead.`);
+      // Reached both by a hand-built allocation and by adding from the picker,
+      // which starts a new asset at zero — so the message must fit both.
+      errors.push(`${describe(t)} has no weight yet — give it one, or remove it.`);
     }
     total += t.weight;
 

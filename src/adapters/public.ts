@@ -10,6 +10,14 @@
  */
 
 import type { ExchangeInfo, Kline, OrderBook, SymbolFilters } from "../types";
+
+export type TickerRow = {
+  symbol: string;
+  pair: string;
+  priceUsd: number;
+  change24hPct: number;
+  quoteVolume24hUsd: number;
+};
 import type { MarketAdapter } from "./types";
 
 const HOSTS = ["https://api.binance.com", "https://data-api.binance.vision"];
@@ -54,7 +62,11 @@ function num(v: unknown, fallback = 0): number {
 
 export class PublicAdapter implements MarketAdapter {
   private exchangeInfoCache = new Map<string, SymbolFilters>();
-  private tickerCache: { pairs: Set<string>; volumes: Record<string, number> } | null = null;
+  private tickerCache: {
+    pairs: Set<string>;
+    volumes: Record<string, number>;
+    rows: TickerRow[];
+  } | null = null;
 
   constructor(private readonly quoteAsset = "USDT") {}
 
@@ -120,18 +132,42 @@ export class PublicAdapter implements MarketAdapter {
    * and takes seconds to parse. /ticker/24hr is ~1.9 MB and gives us both the
    * symbol universe and the volume ranking that basket resolution needs (§7.3).
    */
-  private async getTicker(): Promise<{ pairs: Set<string>; volumes: Record<string, number> }> {
+  private async getTicker() {
     if (this.tickerCache) return this.tickerCache;
-    const rows = await getJson<{ symbol: string; quoteVolume: string }[]>("/api/v3/ticker/24hr");
+    const raw = await getJson<
+      { symbol: string; quoteVolume: string; lastPrice: string; priceChangePercent: string }[]
+    >("/api/v3/ticker/24hr");
+
     const pairs = new Set<string>();
     const volumes: Record<string, number> = {};
-    for (const r of rows) {
+    const rows: TickerRow[] = [];
+
+    for (const r of raw) {
       if (!r.symbol.endsWith(this.quoteAsset)) continue;
+      const symbol = r.symbol.slice(0, -this.quoteAsset.length);
       pairs.add(r.symbol);
-      volumes[r.symbol.slice(0, -this.quoteAsset.length)] = num(r.quoteVolume);
+      volumes[symbol] = num(r.quoteVolume);
+      rows.push({
+        symbol,
+        pair: r.symbol,
+        priceUsd: num(r.lastPrice),
+        change24hPct: num(r.priceChangePercent),
+        quoteVolume24hUsd: num(r.quoteVolume),
+      });
     }
-    this.tickerCache = { pairs, volumes };
+
+    rows.sort((a, b) => b.quoteVolume24hUsd - a.quoteVolume24hUsd);
+    this.tickerCache = { pairs, volumes, rows };
     return this.tickerCache;
+  }
+
+  /**
+   * The tradable universe with live price and 24h change, ordered by volume.
+   * One upstream call serves the whole token picker — no per-row requests, and
+   * nothing here is hard-coded or estimated.
+   */
+  async getTickerRows(limit = 300): Promise<TickerRow[]> {
+    return (await this.getTicker()).rows.slice(0, limit);
   }
 
   /**

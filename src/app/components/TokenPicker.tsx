@@ -1,0 +1,230 @@
+"use client";
+
+/**
+ * Token picker — search, category chips, and a live list.
+ *
+ * Structure follows PortfolioAgentUI.jsx. The data does not: that file ships a
+ * static token table with baked-in prices and synthesises each sparkline from a
+ * hash of the ticker. Everything here is live — price, 24h change and volume
+ * from one Binance ticker call, sparklines from real hourly closes fetched for
+ * the rows actually on screen.
+ *
+ * Logos are monograms rather than a CDN image. A remote icon host is one more
+ * thing to break mid-demo, and a broken image is worse than a clean initial.
+ */
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { Sparkline } from "./ui";
+import { CATEGORIES, type CategoryKey, displayName, inCategory } from "@/lib/categories";
+
+export type TokenRow = {
+  symbol: string;
+  pair: string;
+  priceUsd: number;
+  change24hPct: number;
+  quoteVolume24hUsd: number;
+  categories: CategoryKey[];
+};
+
+const VISIBLE = 12;
+
+function price(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  if (n >= 1) return `$${n.toFixed(2)}`;
+  if (n >= 0.01) return `$${n.toFixed(4)}`;
+  return `$${n.toPrecision(3)}`;
+}
+
+function volume(n: number): string {
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
+  return `$${(n / 1e3).toFixed(0)}K`;
+}
+
+/** Deterministic, low-chroma tint so the monograms sit inside the palette. */
+function tint(symbol: string): string {
+  let h = 0;
+  for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) % 360;
+  return `hsl(${h} 32% 88%)`;
+}
+
+function Mono({ symbol }: { symbol: string }) {
+  return (
+    <div
+      style={{
+        width: 32,
+        height: 32,
+        flex: "none",
+        borderRadius: 999,
+        background: tint(symbol),
+        border: "1px solid var(--line)",
+        display: "grid",
+        placeItems: "center",
+        fontSize: symbol.length > 4 ? 9 : 10.5,
+        fontWeight: 800,
+        color: "var(--ink-2)",
+        letterSpacing: "-0.02em",
+      }}
+      aria-hidden="true"
+    >
+      {symbol.slice(0, 4)}
+    </div>
+  );
+}
+
+export function TokenPicker({
+  held,
+  onToggle,
+}: {
+  held: Set<string>;
+  onToggle: (symbol: string) => void;
+}) {
+  const [tokens, setTokens] = useState<TokenRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState<CategoryKey>("all");
+  const [series, setSeries] = useState<Record<string, number[]>>({});
+  const inflight = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetch("/api/tokens?limit=250")
+      .then((r) => r.json())
+      .then((j) => (j.error ? setError(j.error) : setTokens(j.tokens as TokenRow[])))
+      .catch(() => setError("Could not reach Binance market data."));
+  }, []);
+
+  const list = useMemo(() => {
+    if (!tokens) return [];
+    const needle = q.trim().toUpperCase();
+    return tokens
+      .filter((t) => inCategory(t.symbol, cat))
+      .filter(
+        (t) =>
+          !needle ||
+          t.symbol.includes(needle) ||
+          (displayName(t.symbol) ?? "").toUpperCase().includes(needle),
+      )
+      .slice(0, 60);
+  }, [tokens, q, cat]);
+
+  // Sparklines only for the rows on screen, once each.
+  const wanted = useMemo(() => list.slice(0, VISIBLE).map((t) => t.symbol), [list]);
+
+  useEffect(() => {
+    const missing = wanted.filter((s) => !(s in series) && !inflight.current.has(s));
+    if (missing.length === 0) return;
+    missing.forEach((s) => inflight.current.add(s));
+
+    const id = setTimeout(() => {
+      fetch(`/api/sparks?symbols=${missing.join(",")}`)
+        .then((r) => r.json())
+        .then((j) => setSeries((prev) => ({ ...prev, ...(j.series ?? {}) })))
+        .catch(() => {
+          /* no sparkline is fine */
+        })
+        .finally(() => missing.forEach((s) => inflight.current.delete(s)));
+    }, 180); // debounce typing
+
+    return () => clearTimeout(id);
+  }, [wanted, series]);
+
+  return (
+    <div className="card card-p">
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Add assets</h2>
+        <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
+          {tokens ? `${tokens.length} tradable pairs · live prices` : "loading…"}
+        </span>
+      </div>
+
+      <div className="search" style={{ marginTop: 14 }}>
+        <span style={{ color: "var(--ink-3)", fontSize: 13 }}>⌕</span>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search any token on Binance"
+          aria-label="Search tokens"
+        />
+        {q && (
+          <button className="btn-link" onClick={() => setQ("")} aria-label="Clear search">
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 7, marginTop: 12, flexWrap: "wrap" }}>
+        {CATEGORIES.map((c) => (
+          <button key={c.key} className="chip" data-on={cat === c.key ? 1 : 0} onClick={() => setCat(c.key)}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <p style={{ fontSize: 12.5, color: "var(--red)", marginTop: 14 }}>{error}</p>
+      )}
+
+      <div className="scroll" style={{ marginTop: 12, maxHeight: 340, marginInline: -6 }}>
+        {!tokens && !error && (
+          <p style={{ fontSize: 12.5, color: "var(--ink-3)", padding: "16px 6px" }}>
+            Loading the tradable universe…
+          </p>
+        )}
+
+        {tokens && list.length === 0 && (
+          <p style={{ fontSize: 12.5, color: "var(--ink-3)", padding: "16px 6px" }}>
+            Nothing matches “{q}”{cat !== "all" ? ` in ${CATEGORIES.find((c) => c.key === cat)?.label}` : ""}.
+          </p>
+        )}
+
+        {list.map((t) => {
+          const on = held.has(t.symbol);
+          const name = displayName(t.symbol);
+          const up = t.change24hPct >= 0;
+          return (
+            <button key={t.symbol} className="tk" data-in={on ? 1 : 0} onClick={() => onToggle(t.symbol)}>
+              <Mono symbol={t.symbol} />
+
+              <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t.symbol}</div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--ink-3)",
+                    marginTop: 1,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {name ?? t.pair} · {volume(t.quoteVolume24hUsd)} 24h
+                </div>
+              </div>
+
+              <Sparkline closes={series[t.symbol] ?? []} width={54} height={24} />
+
+              <div style={{ textAlign: "right", minWidth: 78 }}>
+                <div className="m" style={{ fontSize: 12.5, fontWeight: 600 }}>
+                  {price(t.priceUsd)}
+                </div>
+                <div className="m" style={{ fontSize: 11.5, marginTop: 2, color: up ? "var(--green)" : "var(--red)" }}>
+                  {up ? "+" : ""}
+                  {t.change24hPct.toFixed(1)}%
+                </div>
+              </div>
+
+              <span className="tk-add">{on ? "✓" : "+"}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "12px 0 0", lineHeight: 1.55 }}>
+        Prices, 24-hour changes and volumes are live from Binance. Category chips are an editorial
+        grouping — “All” is the full exchange list, and the chips only ever narrow it.
+      </p>
+    </div>
+  );
+}

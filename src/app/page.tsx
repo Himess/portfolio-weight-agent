@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Portfolio } from "./components/Portfolio";
 import { Handoff, ProposalView } from "./components/Proposal";
-import { Sparkline, Swatch } from "./components/ui";
+import { TokenPicker } from "./components/TokenPicker";
+import { Swatch } from "./components/ui";
 import { validateAllocation } from "@/core/allocation";
 import { pct } from "@/lib/format";
 import type { Allocation, BasketResolution, Preference, Proposal, Target } from "@/types";
@@ -283,6 +284,15 @@ function Allocate(props: {
   busy: boolean;
 }) {
   const { targets, setTargets, totalWeight, onTarget, validation, ctx } = props;
+  // Every symbol the allocation already refers to, basket members included.
+  const heldSymbols = useMemo(() => {
+    const out = new Set<string>();
+    for (const t of targets) {
+      if (t.kind === "asset") out.add(t.symbol);
+      else for (const m of t.members) out.add(m.symbol);
+    }
+    return out;
+  }, [targets]);
   const [phrase, setPhrase] = useState("");
   const [resolving, setResolving] = useState(false);
   const [pending, setPending] = useState<{ phrase: string; res: BasketResolution } | null>(null);
@@ -400,6 +410,21 @@ function Allocate(props: {
             </ul>
           )}
         </div>
+
+        <TokenPicker
+          held={heldSymbols}
+          onToggle={(sym) => {
+            const isLeaf = targets.some((t) => t.kind === "asset" && t.symbol === sym);
+            if (isLeaf) {
+              setTargets(targets.filter((t) => !(t.kind === "asset" && t.symbol === sym)));
+              return;
+            }
+            // A symbol inside a pinned basket is not a free-standing target;
+            // removing it there would silently rewrite the basket.
+            if (heldSymbols.has(sym)) return;
+            setTargets([...targets, { kind: "asset", symbol: sym, weight: 0 }]);
+          }}
+        />
 
         <div className="card card-p">
           <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Add a category</h2>
@@ -615,8 +640,12 @@ function Allocate(props: {
           {props.busy ? "Reviewing…" : "Review my portfolio"}
         </button>
         {!validation.ok && (
-          <p style={{ fontSize: 11.5, color: "var(--amber)", margin: "-8px 0 0", textAlign: "center" }}>
-            Weights must total 100% before the agent can review.
+          // Show the actual blocker. "Weights must total 100%" is wrong and
+          // confusing when the total already reads 100% and the real problem is
+          // a newly-added asset still sitting at zero.
+          <p style={{ fontSize: 11.5, color: "var(--amber)", margin: "-8px 0 0", textAlign: "center", lineHeight: 1.5 }}>
+            {validation.errors[0]}
+            {validation.errors.length > 1 && ` (+${validation.errors.length - 1} more)`}
           </p>
         )}
       </div>
