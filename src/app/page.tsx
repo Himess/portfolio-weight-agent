@@ -55,6 +55,14 @@ export default function Page() {
   const [source, setSource] = useState<"replay" | "public">("replay");
   const [bar, setBar] = useState(8500);
   const [seedBar, setSeedBar] = useState(30);
+  // Live mode has no account access without MCP, so holdings are entered here.
+  const [holdings, setHoldings] = useState<{ symbol: string; qty: string }[]>([
+    { symbol: "BTC", qty: "0.25" },
+    { symbol: "ETH", qty: "5" },
+    { symbol: "SOL", qty: "70" },
+    { symbol: "AVAX", qty: "400" },
+    { symbol: "USDT", qty: "6000" },
+  ]);
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [busy, setBusy] = useState(false);
@@ -89,6 +97,14 @@ export default function Page() {
           bar,
           seedBar: source === "replay" ? seedBar : undefined,
           seedNavUsd: 100_000,
+          quantities:
+            source === "public"
+              ? Object.fromEntries(
+                  holdings
+                    .filter((h) => h.symbol.trim() && Number(h.qty) > 0)
+                    .map((h) => [h.symbol.trim().toUpperCase(), Number(h.qty)]),
+                )
+              : undefined,
           daysSinceLastRebalance: source === "replay" ? Math.round((bar - seedBar) / 24) : null,
         }),
       });
@@ -174,6 +190,8 @@ export default function Page() {
           setBar={setBar}
           seedBar={seedBar}
           setSeedBar={setSeedBar}
+          holdings={holdings}
+          setHoldings={setHoldings}
           onReview={review}
           busy={busy}
         />
@@ -236,6 +254,8 @@ function AllocateScreen(props: {
   setBar: (n: number) => void;
   seedBar: number;
   setSeedBar: (n: number) => void;
+  holdings: { symbol: string; qty: string }[];
+  setHoldings: (h: { symbol: string; qty: string }[]) => void;
   onReview: () => void;
   busy: boolean;
 }) {
@@ -537,6 +557,48 @@ function AllocateScreen(props: {
                 The portfolio is bought on target and then left alone. Drift is produced by the
                 market moving under it — exactly as it would in life.
               </p>
+            </div>
+          )}
+
+          {props.source === "public" && (
+            <div className="mt-4 space-y-2 border-t pt-4">
+              <div className="text-xs text-mut">
+                Your holdings. The MCP account scope would read these; without it, enter them here.
+              </div>
+              {props.holdings.map((h, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={h.symbol}
+                    onChange={(e) => {
+                      const next = [...props.holdings];
+                      next[i] = { ...next[i], symbol: e.target.value };
+                      props.setHoldings(next);
+                    }}
+                    className="w-20 rounded border bg-panel-2 px-2 py-1 text-sm uppercase"
+                  />
+                  <input
+                    value={h.qty}
+                    onChange={(e) => {
+                      const next = [...props.holdings];
+                      next[i] = { ...next[i], qty: e.target.value };
+                      props.setHoldings(next);
+                    }}
+                    className="tnum flex-1 rounded border bg-panel-2 px-2 py-1 text-right text-sm"
+                  />
+                  <button
+                    onClick={() => props.setHoldings(props.holdings.filter((_, j) => j !== i))}
+                    className="text-xs text-mut"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => props.setHoldings([...props.holdings, { symbol: "", qty: "0" }])}
+                className="w-full rounded-lg border px-3 py-1.5 text-xs"
+              >
+                Add holding
+              </button>
             </div>
           )}
         </section>
