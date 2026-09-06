@@ -37,59 +37,129 @@ export function ringColor(i: number): string {
 export function Ring({
   slices,
   totalPct,
+  current,
+  outsideCount,
   size = 148,
 }: {
   slices: { label: string; pct: number }[];
   totalPct: number;
+  /** Current weight per label. When given, a second inner ring is drawn. */
+  current?: Record<string, number>;
+  /** Positions outside their band, for the centre readout */
+  outsideCount?: number;
   size?: number;
 }) {
-  const stroke = 16;
-  const r = (size - stroke) / 2 - 1;
-  const c = 2 * Math.PI * r;
+  const outerW = 15;
+  const innerW = 9;
+  const gap = 5;
+  const rOuter = (size - outerW) / 2 - 1;
+  const rInner = rOuter - outerW / 2 - gap - innerW / 2;
+  const cOuter = 2 * Math.PI * rOuter;
+  const cInner = 2 * Math.PI * rInner;
   const onTarget = Math.abs(totalPct - 100) < 0.05;
+  const hasCurrent = current != null;
 
-  let acc = 0;
+  // Both rings are drawn against 100% so the two are directly comparable —
+  // scaling each to its own sum would hide exactly the mismatch we want seen.
+  const scale = Math.max(totalPct, 100);
+  const currentTotal = hasCurrent
+    ? Object.values(current).reduce((a, b) => a + b, 0)
+    : 0;
+  const scaleInner = Math.max(currentTotal, 100);
+
+  let accOuter = 0;
+  let accInner = 0;
+
   return (
     <div style={{ position: "relative", width: size, height: size, flex: "none" }}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} stroke="var(--line)" />
+        <circle cx={size / 2} cy={size / 2} r={rOuter} fill="none" strokeWidth={outerW} stroke="var(--line)" />
+        {hasCurrent && (
+          <circle cx={size / 2} cy={size / 2} r={rInner} fill="none" strokeWidth={innerW} stroke="var(--line)" />
+        )}
+
         {slices.map((s, i) => {
-          const len = (Math.max(s.pct, 0) / Math.max(totalPct, 100)) * c;
-          const off = acc;
-          acc += len;
+          const len = (Math.max(s.pct, 0) / scale) * cOuter;
+          const off = accOuter;
+          accOuter += len;
           return (
             <circle
-              key={s.label}
+              key={`t-${s.label}`}
               cx={size / 2}
               cy={size / 2}
-              r={r}
+              r={rOuter}
               fill="none"
-              strokeWidth={stroke}
+              strokeWidth={outerW}
               stroke={ringColor(i)}
               /* 2px of surface between segments, per the mark spec */
-              strokeDasharray={`${Math.max(len - 2, 0)} ${c}`}
+              strokeDasharray={`${Math.max(len - 2, 0)} ${cOuter}`}
               strokeDashoffset={-off}
               style={{ transition: "stroke-dasharray .4s cubic-bezier(.4,0,.2,1), stroke-dashoffset .4s cubic-bezier(.4,0,.2,1)" }}
             />
           );
         })}
+
+        {hasCurrent &&
+          slices.map((s, i) => {
+            const pctNow = current[s.label] ?? 0;
+            const len = (Math.max(pctNow, 0) / scaleInner) * cInner;
+            const off = accInner;
+            accInner += len;
+            return (
+              <circle
+                key={`c-${s.label}`}
+                cx={size / 2}
+                cy={size / 2}
+                r={rInner}
+                fill="none"
+                strokeWidth={innerW}
+                stroke={ringColor(i)}
+                strokeDasharray={`${Math.max(len - 2, 0)} ${cInner}`}
+                strokeDashoffset={-off}
+                opacity={0.55}
+                style={{ transition: "stroke-dasharray .4s cubic-bezier(.4,0,.2,1), stroke-dashoffset .4s cubic-bezier(.4,0,.2,1)" }}
+              />
+            );
+          })}
       </svg>
+
       <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
         <div style={{ textAlign: "center" }}>
-          <div
-            className="m"
-            style={{
-              fontSize: 26,
-              fontWeight: 600,
-              letterSpacing: "-0.04em",
-              color: onTarget ? "var(--ink)" : "var(--amber)",
-            }}
-          >
-            {totalPct.toFixed(0)}%
-          </div>
-          <div className="lbl" style={{ marginTop: 2 }}>
-            allocated
-          </div>
+          {hasCurrent ? (
+            <>
+              <div
+                className="m"
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  letterSpacing: "-0.03em",
+                  color: outsideCount ? "var(--red)" : "var(--green)",
+                }}
+              >
+                {outsideCount ? outsideCount : "0"}
+              </div>
+              <div className="lbl" style={{ marginTop: 2, maxWidth: 74, lineHeight: 1.3 }}>
+                outside band
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className="m"
+                style={{
+                  fontSize: 26,
+                  fontWeight: 600,
+                  letterSpacing: "-0.04em",
+                  color: onTarget ? "var(--ink)" : "var(--amber)",
+                }}
+              >
+                {totalPct.toFixed(0)}%
+              </div>
+              <div className="lbl" style={{ marginTop: 2 }}>
+                allocated
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

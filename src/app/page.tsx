@@ -12,6 +12,7 @@ import { Handoff, ProposalView } from "./components/Proposal";
 import { TokenPicker } from "./components/TokenPicker";
 import { Swatch } from "./components/ui";
 import { validateAllocation } from "@/core/allocation";
+import { clear as clearSaved, load as loadSaved, save as saveState } from "@/lib/persist";
 import { pct } from "@/lib/format";
 import type { Allocation, BasketResolution, Preference, Proposal, Target } from "@/types";
 
@@ -60,10 +61,21 @@ export default function Page() {
     { symbol: "USDT", qty: "6000" },
   ]);
 
+  const [restoredAt, setRestoredAt] = useState<string | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [series, setSeries] = useState<Record<string, number[]>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Restore before the first paint of the allocation screen. Runs once.
+  useEffect(() => {
+    const saved = loadSaved();
+    if (saved) {
+      setTargets(saved.allocation.targets);
+      setPreference(saved.preference);
+      setRestoredAt(saved.savedAt);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/context")
@@ -77,6 +89,12 @@ export default function Page() {
 
   const allocation: Allocation = useMemo(() => ({ targets, cashSymbol }), [targets]);
   const validation = useMemo(() => validateAllocation(allocation), [allocation]);
+
+  // Persist whatever the user has built. Only valid allocations are written, so
+  // a half-edited state cannot be restored into a broken one later.
+  useEffect(() => {
+    if (validation.ok) saveState(allocation, preference);
+  }, [allocation, preference, validation.ok]);
   const totalWeight = targets.reduce((a, t) => a + t.weight, 0);
   const onTarget = Math.abs(totalWeight - 1) < 1e-6;
 
@@ -208,6 +226,13 @@ export default function Page() {
           setHoldings={setHoldings}
           onReview={review}
           busy={busy}
+          restoredAt={restoredAt}
+          onReset={() => {
+            clearSaved();
+            setTargets(DEFAULT_TARGETS);
+            setPreference("balanced");
+            setRestoredAt(null);
+          }}
         />
       )}
 
@@ -282,6 +307,8 @@ function Allocate(props: {
   setHoldings: (h: { symbol: string; qty: string }[]) => void;
   onReview: () => void;
   busy: boolean;
+  restoredAt: string | null;
+  onReset: () => void;
 }) {
   const { targets, setTargets, totalWeight, onTarget, validation, ctx } = props;
   // Every symbol the allocation already refers to, basket members included.
@@ -336,6 +363,39 @@ function Allocate(props: {
               <div className="lbl">{onTarget ? "allocated" : `${(100 - totalWeight * 100).toFixed(1)}pp to place`}</div>
             </div>
           </div>
+
+          {props.restoredAt && (
+            // Say why they are looking at something other than the defaults,
+            // and make it one click to get back to them.
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginTop: 12,
+                padding: "8px 12px",
+                borderRadius: "var(--r-sm)",
+                background: "var(--surface-2)",
+                border: "1px solid var(--line)",
+                fontSize: 11.5,
+                color: "var(--ink-2)",
+              }}
+            >
+              <span style={{ flex: 1 }}>
+                Restored your allocation from{" "}
+                {new Date(props.restoredAt).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+                . Saved in this browser only.
+              </span>
+              <button className="btn-link" onClick={props.onReset}>
+                start over
+              </button>
+            </div>
+          )}
 
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
             {targets.map((t, i) => (

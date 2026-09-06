@@ -32,6 +32,12 @@ export function Portfolio({
 
   const outside = rows.filter((r) => r.outsideBand && r.symbol !== cashSymbol);
 
+  // Current weights keyed the same way as the ring slices, so the inner ring
+  // and the legend read off one source.
+  const currentByLabel = Object.fromEntries(
+    rows.map((r) => [r.symbol, r.currentWeight * 100]),
+  ) as Record<string, number>;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* ---- headline ---- */}
@@ -68,17 +74,42 @@ export function Portfolio({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-          <Ring slices={slices} totalPct={slices.reduce((a, s) => a + s.pct, 0)} />
+          <Ring
+            slices={slices}
+            totalPct={slices.reduce((a, s) => a + s.pct, 0)}
+            current={currentByLabel}
+            outsideCount={outside.length}
+          />
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {slices.map((s, i) => (
-              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-                <Swatch i={i} />
-                <span style={{ fontWeight: 600, minWidth: 44 }}>{s.label}</span>
-                <span className="m" style={{ color: "var(--ink-3)" }}>
-                  {pct(s.pct, 0)}
-                </span>
-              </div>
-            ))}
+            <div className="lbl" style={{ display: "flex", gap: 10, marginBottom: 2 }}>
+              <span style={{ minWidth: 52 }} />
+              <span style={{ minWidth: 34 }}>target</span>
+              <span>now</span>
+            </div>
+            {slices.map((s, i) => {
+              const now = currentByLabel[s.label] ?? 0;
+              const moved = Math.abs(now - s.pct) >= 0.05;
+              return (
+                <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 52 }}>
+                    <Swatch i={i} />
+                    <span style={{ fontWeight: 600 }}>{s.label}</span>
+                  </span>
+                  <span className="m" style={{ color: "var(--ink-3)", minWidth: 34 }}>
+                    {pct(s.pct, 0)}
+                  </span>
+                  <span
+                    className="m"
+                    style={{ fontWeight: moved ? 600 : 400, color: moved ? "var(--ink)" : "var(--ink-3)" }}
+                  >
+                    {pct(now, 0)}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="lbl" style={{ marginTop: 3, lineHeight: 1.4, maxWidth: 150 }}>
+              outer ring: target · inner: where you actually are
+            </div>
           </div>
         </div>
 
