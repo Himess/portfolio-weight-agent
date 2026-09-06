@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { SparksQuerySchema } from "@/lib/api-contracts";
+import { MARKET_LIMIT, rateLimit } from "@/server/guard";
 import { TtlCache } from "@/lib/cache";
 import { publicAdapter } from "@/server/session";
 
@@ -23,6 +24,9 @@ const cache = new TtlCache<number[]>({ ttlMs: 5 * 60_000, max: 400 });
  * rather than anything invented when a symbol has no series.
  */
 export async function GET(req: Request) {
+  const limited = rateLimit(req, "sparks", MARKET_LIMIT);
+  if (limited) return limited;
+
   const { symbols } = SparksQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
   if (symbols.length === 0) return NextResponse.json({ series: {} });
 

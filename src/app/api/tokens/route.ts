@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { TokensQuerySchema } from "@/lib/api-contracts";
+import { MARKET_LIMIT, rateLimit } from "@/server/guard";
 import { failure } from "@/server/respond";
 import { publicAdapter } from "@/server/session";
 import { categoriesFor } from "@/lib/categories";
@@ -16,6 +17,9 @@ export const maxDuration = 60;
  * prices, which would put stale numbers on screen the moment it was written.
  */
 export async function GET(req: Request) {
+  const limited = rateLimit(req, "tokens", MARKET_LIMIT);
+  if (limited) return limited;
+
   try {
     const { limit } = TokensQuerySchema.parse(
       Object.fromEntries(new URL(req.url).searchParams),

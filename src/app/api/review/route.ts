@@ -4,6 +4,7 @@ import { runReview } from "@/agent";
 import { ReplayAdapter } from "@/adapters/replay";
 import { flattenTargets, validateAllocation } from "@/core/allocation";
 import { ReviewRequestSchema } from "@/lib/api-contracts";
+import { REVIEW_LIMIT, rateLimit, restoreSession } from "@/server/guard";
 import { badRequest, failure } from "@/server/respond";
 import { mcpBalances, publicAdapter, replayAdapter, statusFor } from "@/server/session";
 import type { Allocation } from "@/types";
@@ -33,6 +34,10 @@ export const maxDuration = 120;
 
 /** POST -> Proposal. Runs the full loop: drift -> candidates -> timing -> execution -> narrative. */
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "review", REVIEW_LIMIT);
+  if (limited) return limited;
+  restoreSession(req);
+
   try {
     // Shape is enforced here, so nothing downstream has to re-check it.
     const body = ReviewRequestSchema.parse(await req.json());

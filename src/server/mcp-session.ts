@@ -120,10 +120,23 @@ export type McpToken = {
   via: "oauth" | "pasted" | "env";
 };
 
+/**
+ * Process-local cache of the token.
+ *
+ * On a long-lived server this is the whole store. On serverless it is only
+ * a per-invocation convenience — the durable copy travels in a sealed
+ * httpOnly cookie, because a module-level value does not survive the next
+ * request landing on a different instance.
+ */
 let token: McpToken | null = null;
 
 export function setToken(next: McpToken): void {
   token = next;
+}
+
+/** Adopt a token recovered from the request's cookie. */
+export function adoptToken(next: McpToken | null): void {
+  if (next) token = next;
 }
 
 export function getToken(): McpToken | null {
@@ -166,7 +179,9 @@ export function clientId(): string | null {
   return process.env.BINANCE_MCP_CLIENT_ID ?? null;
 }
 
-export async function buildAuthorizeUrl(redirectUri: string): Promise<{ url: string; state: string }> {
+export async function buildAuthorizeUrl(
+  redirectUri: string,
+): Promise<{ url: string; state: string; verifier: string }> {
   const id = clientId();
   if (!id) {
     throw new Error(
@@ -179,6 +194,8 @@ export async function buildAuthorizeUrl(redirectUri: string): Promise<{ url: str
   const meta = await authServerMetadata();
   const verifier = createVerifier();
   const state = createState();
+  // Also kept in-process, which is enough on a long-lived server; the
+  // caller seals a copy into a cookie for the serverless case.
   rememberPending(state, verifier, redirectUri);
 
   const url = new URL(meta.authorization_endpoint);
@@ -190,7 +207,7 @@ export async function buildAuthorizeUrl(redirectUri: string): Promise<{ url: str
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("resource", MCP_ENDPOINT);
 
-  return { url: url.toString(), state };
+  return { url: url.toString(), state, verifier };
 }
 
 export async function exchangeCode(code: string, verifier: string, redirectUri: string): Promise<McpToken> {

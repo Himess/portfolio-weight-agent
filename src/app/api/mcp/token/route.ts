@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { McpTokenRequestSchema } from "@/lib/api-contracts";
 import { forgetDiscovery, discover } from "@/server/mcp-client";
 import { setToken } from "@/server/mcp-session";
+import { COOKIE, cookieOptions, seal } from "@/server/sealed";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,11 +27,24 @@ export async function POST(req: Request) {
     forgetDiscovery();
 
     const discovery = await discover(true);
-    return NextResponse.json({
+
+    const res = NextResponse.json({
       connected: true,
       tools: discovery.tools.map((t) => ({ name: t.name, description: t.description })),
       capabilities: discovery.capabilities,
     });
+    // Survives a restart or a different serverless instance; a day, since
+    // a pasted token carries no stated lifetime.
+    const secure = new URL(req.url).protocol === "https:";
+    res.cookies.set(
+      COOKIE.token,
+      seal(
+        { accessToken: token, expiresAt: null, obtainedAt: Date.now(), via: "pasted" as const },
+        86_400_000,
+      ),
+      cookieOptions(86_400, secure),
+    );
+    return res;
   } catch (err) {
     const { clearToken } = await import("@/server/mcp-session");
     clearToken();

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { cachedDiscovery, discover, NotConnected } from "@/server/mcp-client";
+import { restoreSession } from "@/server/guard";
 import { clientId, getToken, MCP_ENDPOINT } from "@/server/mcp-session";
 
 export const runtime = "nodejs";
 
 /** GET — is the MCP server connected, and what did it turn out to expose? */
-export async function GET() {
+export async function GET(req: Request) {
+  restoreSession(req);
   const token = getToken();
 
   if (!token) {
@@ -44,11 +46,14 @@ export async function GET() {
   });
 }
 
-/** DELETE — drop the token. */
+/** DELETE — drop the token, in this process and in the browser. */
 export async function DELETE() {
   const { clearToken } = await import("@/server/mcp-session");
   const { forgetDiscovery } = await import("@/server/mcp-client");
+  const { COOKIE } = await import("@/server/sealed");
   clearToken();
   forgetDiscovery();
-  return NextResponse.json({ connected: false });
+  const res = NextResponse.json({ connected: false });
+  res.cookies.delete(COOKIE.token);
+  return res;
 }
