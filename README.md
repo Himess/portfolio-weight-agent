@@ -211,6 +211,50 @@ that lost two thirds of its value. That is the trade people cannot make themselv
 
 ---
 
+## What the interface does
+
+Four screens; three of them carry the product.
+
+**Allocate.** A live token picker over the full Binance USDT universe — 250 pairs
+ordered by real 24h volume, with real price and change, official logos, and
+sparklines drawn from real hourly closes. Search runs against the exchange, not a
+curated list: typing `sol` returns SOL, SOLV and BNSOL.
+
+That last detail is why there is a safety layer rather than a contract-address
+column. This app trades **spot pairs, not on-chain tokens** — no contract is
+involved in a spot order, BTC has no ERC-20 address, ETH is native, and a
+contract column would be empty or arbitrary for the largest holdings while
+implying the app trades that on-chain token. The hazards that *do* apply here are
+measurable from live data, so `src/lib/safety.ts` flags them:
+
+| Badge | Means | Derived from |
+|---|---|---|
+| `like SOL` | reads like a much larger ticker | one symbol contains the other **and** the other has >20× the volume |
+| `thin` | your own order will move the price | 24h quote volume below the tier threshold |
+
+Live result: SOL clean, SOLV and BNSOL both flagged on both counts. Deliberate
+non-warnings are tested too — ARB and ARK merely share letters, and two
+comparable-volume names are not a trap.
+
+Your allocation is saved locally and restored on return, with a banner saying so
+and one click back to defaults. Nothing leaves the browser.
+
+**Portfolio.** Total drift is the largest thing on the page, because it decides
+whether anything happens. The ring shows target on the outside and where you
+actually are on the inside, both scaled against 100% so the mismatch is the thing
+you see. Each position gets a deviation meter with its tolerance band drawn as a
+region — which answers "outside, and which way" in a way a progress bar cannot.
+
+**Proposal.** The decision, the reasoning, the cost, and a line naming what the
+plan actually does: *"This buys AVAX while it is down 2.5% today — adding to a
+loser, which is the part that feels wrong and is the point."* That is computed
+from the traded assets' 24h change, and stays silent when the plan does not have
+that shape.
+
+**HOLD** gets its own layout — see below.
+
+---
+
 ## How the numbers are computed
 
 | Quantity | Definition |
