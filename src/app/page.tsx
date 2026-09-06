@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Portfolio } from "./components/Portfolio";
 import { Handoff, ProposalView } from "./components/Proposal";
+import { McpPanel } from "./components/McpPanel";
 import { TokenPicker } from "./components/TokenPicker";
 import { Swatch } from "./components/ui";
 import { validateAllocation } from "@/core/allocation";
@@ -664,6 +665,8 @@ function Allocate(props: {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <McpPanel />
+
         <div className="card card-p">
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>How closely to track</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
