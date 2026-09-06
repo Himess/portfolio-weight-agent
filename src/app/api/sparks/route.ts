@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 
+import { SparksQuerySchema } from "@/lib/api-contracts";
+import { TtlCache } from "@/lib/cache";
 import { publicAdapter } from "@/server/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** In-process cache: a 24h sparkline does not need re-fetching per keystroke. */
-const cache = new Map<string, { at: number; closes: number[] }>();
-const TTL_MS = 5 * 60_000;
-const MAX_SYMBOLS = 14;
+/**
+ * Bounded so the cache cannot grow one entry per symbol anyone ever searched.
+ * `wrap` also collapses concurrent requests for the same symbol into one
+ * upstream call, which matters here because the picker asks for a batch on
+ * every filter change.
+ */
+const cache = new TtlCache<number[]>({ ttlMs: 5 * 60_000, max: 400 });
 
 /**
  * GET /api/sparks?symbols=BTC,ETH — real hourly closes for sparklines.
@@ -18,32 +23,22 @@ const MAX_SYMBOLS = 14;
  * rather than anything invented when a symbol has no series.
  */
 export async function GET(req: Request) {
-  const raw = new URL(req.url).searchParams.get("symbols") ?? "";
-  const symbols = [...new Set(raw.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean))].slice(
-    0,
-    MAX_SYMBOLS,
-  );
-
+  const { symbols } = SparksQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
   if (symbols.length === 0) return NextResponse.json({ series: {} });
 
   const adapter = publicAdapter();
-  const now = Date.now();
   const series: Record<string, number[]> = {};
 
   await Promise.all(
     symbols.map(async (symbol) => {
-      const hit = cache.get(symbol);
-      if (hit && now - hit.at < TTL_MS) {
-        series[symbol] = hit.closes;
-        return;
-      }
       try {
-        const kl = await adapter.getKlines(symbol, "1h", 24);
-        const closes = kl.map((k) => k.close).filter((c) => c > 0);
-        if (closes.length >= 3) {
-          cache.set(symbol, { at: now, closes });
-          series[symbol] = closes;
-        }
+        const closes = await cache.wrap(symbol, async () => {
+          const kl = await adapter.getKlines(symbol, "1h", 24);
+          const values = kl.map((k) => k.close).filter((c) => c > 0);
+          if (values.length < 3) throw new Error("no usable series");
+          return values;
+        });
+        series[symbol] = closes;
       } catch {
         /* a missing sparkline is fine; a fabricated one is not */
       }

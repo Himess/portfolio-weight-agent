@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import { runReview } from "@/agent";
 import { ReplayAdapter } from "@/adapters/replay";
 import { flattenTargets, validateAllocation } from "@/core/allocation";
+import { ReviewRequestSchema } from "@/lib/api-contracts";
+import { badRequest, failure } from "@/server/respond";
 import { publicAdapter, replayAdapter, statusFor } from "@/server/session";
-import type { Allocation, Preference } from "@/types";
+import type { Allocation } from "@/types";
 
 /** Buy the target allocation exactly, at a given replay bar. */
 async function seedOnTarget(
@@ -29,42 +31,23 @@ async function seedOnTarget(
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-type Body = {
-  allocation: Allocation;
-  quantities?: Record<string, number>;
-  preference?: Preference;
-  daysSinceLastRebalance?: number | null;
-  source?: "public" | "replay";
-  dataset?: string;
-  bar?: number;
-  /**
-   * Replay only: buy the target allocation exactly at this bar, then hold those
-   * quantities while `bar` advances. This is how drift is produced for a demo —
-   * the portfolio is untouched and the market moves under it.
-   */
-  seedBar?: number;
-  seedNavUsd?: number;
-};
-
 /** POST -> Proposal. Runs the full loop: drift -> candidates -> timing -> execution -> narrative. */
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as Body;
+    // Shape is enforced here, so nothing downstream has to re-check it.
+    const body = ReviewRequestSchema.parse(await req.json());
 
+    // Shape being right does not make the weights add up. That is a
+    // separate question and the core owns it.
     const validation = validateAllocation(body.allocation);
-    if (!validation.ok) {
-      return NextResponse.json({ error: validation.errors.join(" ") }, { status: 400 });
-    }
+    if (!validation.ok) return badRequest(validation.errors.join(" "));
 
     const source = body.source ?? "public";
     const market =
       source === "replay" ? await replayAdapter(body.dataset, body.bar) : publicAdapter();
 
     if (!market) {
-      return NextResponse.json(
-        { error: "No replay dataset found. Run `npm run klines` first." },
-        { status: 400 },
-      );
+      return badRequest("No replay dataset found. Run `npm run klines` first.");
     }
 
     let quantities = body.quantities ?? {};
@@ -75,18 +58,15 @@ export async function POST(req: Request) {
     }
 
     if (Object.keys(quantities).length === 0) {
-      return NextResponse.json(
-        { error: "No holdings supplied. Enter quantities, or use replay with a seed bar." },
-        { status: 400 },
-      );
+      return badRequest("No holdings supplied. Enter quantities, or use replay with a seed bar.");
     }
 
     const proposal = await runReview({
       market,
       allocation: body.allocation,
       quantities,
-      preference: body.preference ?? "balanced",
-      daysSinceLastRebalance: body.daysSinceLastRebalance ?? null,
+      preference: body.preference,
+      daysSinceLastRebalance: body.daysSinceLastRebalance,
     });
 
     // Real hourly closes for the sparklines. Never synthesised: a made-up
@@ -109,9 +89,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ proposal, status: statusFor(source), quantities, series });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Review failed." },
-      { status: 500 },
-    );
+    return failure(err, "The review");
   }
 }

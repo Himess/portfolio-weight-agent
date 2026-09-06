@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { McpTokenRequestSchema } from "@/lib/api-contracts";
 import { forgetDiscovery, discover } from "@/server/mcp-client";
 import { setToken } from "@/server/mcp-session";
 
@@ -20,17 +21,8 @@ export const maxDuration = 60;
  */
 export async function POST(req: Request) {
   try {
-    const { token } = (await req.json()) as { token?: string };
-    const trimmed = token?.trim();
-
-    if (!trimmed) {
-      return NextResponse.json({ error: "No token supplied." }, { status: 400 });
-    }
-    if (trimmed.length < 20) {
-      return NextResponse.json({ error: "That does not look like an access token." }, { status: 400 });
-    }
-
-    setToken({ accessToken: trimmed, expiresAt: null, obtainedAt: Date.now(), via: "pasted" });
+    const { token } = McpTokenRequestSchema.parse(await req.json());
+    setToken({ accessToken: token, expiresAt: null, obtainedAt: Date.now(), via: "pasted" });
     forgetDiscovery();
 
     const discovery = await discover(true);

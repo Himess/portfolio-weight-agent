@@ -46,8 +46,23 @@ export async function replayAdapter(file?: string, bar?: number) {
   return adapter;
 }
 
+/**
+ * One adapter per quote asset, shared across requests.
+ *
+ * This was constructing a fresh instance per API call, which threw away the
+ * caches with it: every request re-downloaded the ~1.9 MB ticker snapshot from
+ * Binance. Measured at 356-919ms of pure waste per request, plus the bandwidth
+ * and the rate-limit budget.
+ */
+const adapters = new Map<string, PublicAdapter>();
+
 export function publicAdapter(quote = "USDT"): PublicAdapter {
-  return new PublicAdapter(quote);
+  let adapter = adapters.get(quote);
+  if (!adapter) {
+    adapter = new PublicAdapter(quote);
+    adapters.set(quote, adapter);
+  }
+  return adapter;
 }
 
 export function statusFor(kind: "public" | "replay"): AdapterStatus {

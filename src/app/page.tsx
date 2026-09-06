@@ -146,7 +146,10 @@ export default function Page() {
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(explain(json.error, res.status));
+      // The API now returns a stable code alongside the prose, so the client
+      // branches on that instead of pattern-matching an error message that
+      // could be reworded at any time.
+      if (!res.ok) throw new Error(explain(json));
 
       const p = json.proposal as Proposal;
       setProposal(p);
@@ -322,23 +325,26 @@ export default function Page() {
   );
 }
 
-/** Upstream errors are for operators; this turns them into a next action. */
-function explain(message: unknown, status: number): string {
-  const text = typeof message === "string" ? message : "Review failed.";
-  if (/rate limit|429|quota/i.test(text)) {
-    return (
-      "The model provider is rate-limited right now — free tiers cap requests per minute and per day. " +
-      "Wait a minute and try again, or switch provider in .env. Nothing was sent."
-    );
+type ApiError = { error?: string; code?: string; retryable?: boolean };
+
+/**
+ * The server already writes messages meant for a person, so this mostly passes
+ * them through — it exists to add the one thing the server cannot know, which
+ * is whether trying again is worth the user's time.
+ */
+function explain(payload: ApiError): string {
+  const text = payload.error ?? "The review failed.";
+  switch (payload.code) {
+    case "rate_limited":
+      return `${text} Free tiers cap requests per minute and per day.`;
+    case "upstream_timeout":
+    case "upstream_unavailable":
+      return `${text}${payload.retryable ? " This usually clears on its own." : ""}`;
+    case "not_connected":
+      return `${text} Reconnect from the Binance account panel.`;
+    default:
+      return text;
   }
-  if (/no LLM provider/i.test(text)) {
-    return (
-      "No model provider is configured, so the agent cannot form a judgment. " +
-      "The deterministic band rule still works — add a key to .env to enable the rest."
-    );
-  }
-  if (status === 400) return text;
-  return `${text} Nothing was sent to Binance.`;
 }
 
 function Dot({ on }: { on: boolean }) {

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { TokensQuerySchema } from "@/lib/api-contracts";
+import { failure } from "@/server/respond";
 import { publicAdapter } from "@/server/session";
 import { categoriesFor } from "@/lib/categories";
 
@@ -14,18 +16,16 @@ export const maxDuration = 60;
  * prices, which would put stale numbers on screen the moment it was written.
  */
 export async function GET(req: Request) {
-  const limit = Number(new URL(req.url).searchParams.get("limit") ?? 250);
-
   try {
-    const rows = await publicAdapter().getTickerRows(Math.min(Math.max(limit, 1), 500));
+    const { limit } = TokensQuerySchema.parse(
+      Object.fromEntries(new URL(req.url).searchParams),
+    );
+    const rows = await publicAdapter().getTickerRows(limit);
     return NextResponse.json({
       tokens: rows.map((r) => ({ ...r, categories: categoriesFor(r.symbol) })),
       asOf: new Date().toISOString(),
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Could not load tokens." },
-      { status: 500 },
-    );
+    return failure(err, "Loading the tradable universe");
   }
 }

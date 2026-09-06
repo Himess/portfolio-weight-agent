@@ -9,7 +9,11 @@
  * returns 451 there). Only market data is mirrored — that is all we need here.
  */
 
+import { fetchJsonFrom } from "../lib/http";
 import type { ExchangeInfo, Kline, OrderBook, SymbolFilters } from "../types";
+
+/** How long the tradable universe snapshot stays fresh. */
+const TICKER_TTL_MS = 60_000;
 
 export type TickerRow = {
   symbol: string;
@@ -20,30 +24,15 @@ export type TickerRow = {
 };
 import type { MarketAdapter } from "./types";
 
-const HOSTS = ["https://api.binance.com", "https://data-api.binance.vision"];
+/**
+ * Primary first, then Binance's market-data mirror. The primary answers 451 in
+ * some regions; the mirror serves the same payloads without authentication.
+ */
+const HOSTS = ["https://api.binance.com", "https://data-api.binance.vision"] as const;
 
-type FetchInit = { signal?: AbortSignal };
-
-async function getJson<T>(path: string, init: FetchInit = {}): Promise<T> {
-  let lastError: unknown;
-  for (const host of HOSTS) {
-    try {
-      const res = await fetch(`${host}${path}`, {
-        ...init,
-        headers: { Accept: "application/json" },
-      });
-      if (!res.ok) {
-        lastError = new Error(`${host}${path} -> HTTP ${res.status}`);
-        // 451/403 means this host is geo-blocked; try the mirror.
-        if (res.status === 451 || res.status === 403) continue;
-        throw lastError;
-      }
-      return (await res.json()) as T;
-    } catch (err) {
-      lastError = err;
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error(`Request failed: ${path}`);
+/** Timeouts and retries live in lib/http — see the policy note there. */
+function getJson<T>(path: string, timeoutMs = 10_000): Promise<T> {
+  return fetchJsonFrom<T>(HOSTS, path, { timeoutMs });
 }
 
 type RawFilter = { filterType: string; [k: string]: unknown };
@@ -66,6 +55,7 @@ export class PublicAdapter implements MarketAdapter {
     pairs: Set<string>;
     volumes: Record<string, number>;
     rows: TickerRow[];
+    at: number;
   } | null = null;
 
   constructor(private readonly quoteAsset = "USDT") {}
@@ -133,10 +123,15 @@ export class PublicAdapter implements MarketAdapter {
    * symbol universe and the volume ranking that basket resolution needs (§7.3).
    */
   private async getTicker() {
-    if (this.tickerCache) return this.tickerCache;
+    // Prices move, so the universe snapshot expires rather than being kept for
+    // the life of the process.
+    if (this.tickerCache && Date.now() - this.tickerCache.at < TICKER_TTL_MS) {
+      return this.tickerCache;
+    }
+    // ~1.9 MB; worth a longer deadline than a normal call.
     const raw = await getJson<
       { symbol: string; quoteVolume: string; lastPrice: string; priceChangePercent: string }[]
-    >("/api/v3/ticker/24hr");
+    >("/api/v3/ticker/24hr", 20_000);
 
     const pairs = new Set<string>();
     const volumes: Record<string, number> = {};
@@ -157,7 +152,7 @@ export class PublicAdapter implements MarketAdapter {
     }
 
     rows.sort((a, b) => b.quoteVolume24hUsd - a.quoteVolume24hUsd);
-    this.tickerCache = { pairs, volumes, rows };
+    this.tickerCache = { pairs, volumes, rows, at: Date.now() };
     return this.tickerCache;
   }
 
