@@ -1,0 +1,9 @@
+# Working captures are large and regenerable (npm run klines). Only the
+# committed demo slice needs to ship — it is what the deployed replay uses.
+data/*.json
+!data/demo-window.json
+
+# Local-only artefacts
+data/replay-journal.json
+tsconfig.tsbuildinfo
+PortfolioAgentUI.jsx
