@@ -1,0 +1,81 @@
+{
+  "ranAt": "2026-09-06T20:43:04.410Z",
+  "dataset": "window-365d.json",
+  "bands": {
+    "absoluteFloorPp": 1,
+    "relativeBandPct": 0.12
+  },
+  "provider": "Gemini (free tier) · gemini-flash-lite-latest",
+  "checks": 52,
+  "everyBars": 168,
+  "startNavUsd": 100000,
+  "allocation": {
+    "cashSymbol": "USDT",
+    "targets": [
+      {
+        "kind": "asset",
+        "symbol": "BTC",
+        "weight": 0.4
+      },
+      {
+        "kind": "asset",
+        "symbol": "ETH",
+        "weight": 0.2
+      },
+      {
+        "kind": "basket",
+        "label": "L1s",
+        "weight": 0.3,
+        "members": [
+          {
+            "symbol": "SOL",
+            "weight": 0.5
+          },
+          {
+            "symbol": "AVAX",
+            "weight": 0.5
+          }
+        ],
+        "resolvedAt": "2026-01-01T00:00:00.000Z",
+        "rationale": "Large-cap alternative layer-1s, equally weighted."
+      },
+      {
+        "kind": "asset",
+        "symbol": "USDT",
+        "weight": 0.1
+      }
+    ]
+  },
+  "results": [
+    {
+      "strategy": "hold",
+      "avgAbsDriftPp": 10.456,
+      "costPaidUsd": 0,
+      "trades": 0,
+      "finalNavUsd": 61311,
+      "holds": 0,
+      "declinedWhileBandBreached": 0,
+      "llmFallbacks": 0
+    },
+    {
+      "strategy": "threshold",
+      "avgAbsDriftPp": 2.88,
+      "costPaidUsd": 27.74,
+      "trades": 11,
+      "finalNavUsd": 60230,
+      "holds": 0,
+      "declinedWhileBandBreached": 0,
+      "llmFallbacks": 0
+    },
+    {
+      "strategy": "agent",
+      "avgAbsDriftPp": 2.902,
+      "costPaidUsd": 21.57,
+      "trades": 10,
+      "finalNavUsd": 60070,
+      "holds": 44,
+      "declinedWhileBandBreached": 2,
+      "llmFallbacks": 42
+    }
+  ]
+}

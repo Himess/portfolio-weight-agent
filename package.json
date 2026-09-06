@@ -16,7 +16,8 @@
     "mcp:discover": "node --env-file-if-exists=.env --import tsx scripts/discover-mcp-tools.ts",
     "env:check": "node --env-file-if-exists=.env --import tsx scripts/env-check.ts",
     "llm:check": "node --env-file-if-exists=.env --import tsx scripts/llm-check.ts",
-    "hold:example": "node --env-file-if-exists=.env --import tsx scripts/hold-example.ts"
+    "hold:example": "node --env-file-if-exists=.env --import tsx scripts/hold-example.ts",
+    "backtest": "node --env-file-if-exists=.env --import tsx scripts/backtest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

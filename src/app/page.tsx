@@ -13,6 +13,7 @@ import { TokenPicker } from "./components/TokenPicker";
 import { Swatch } from "./components/ui";
 import { validateAllocation } from "@/core/allocation";
 import { clear as clearSaved, load as loadSaved, save as saveState } from "@/lib/persist";
+import { daysSinceLastRebalance, markApproved, record as recordDecision, summary as historySummary } from "@/lib/history";
 import { pct } from "@/lib/format";
 import type { Allocation, BasketResolution, Preference, Proposal, Target } from "@/types";
 
@@ -62,6 +63,12 @@ export default function Page() {
   ]);
 
   const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  const [lastEntryAt, setLastEntryAt] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ total: number; holds: number; approved: number }>({
+    total: 0,
+    holds: 0,
+    approved: 0,
+  });
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [series, setSeries] = useState<Record<string, number[]>>({});
   const [busy, setBusy] = useState(false);
@@ -75,6 +82,7 @@ export default function Page() {
       setPreference(saved.preference);
       setRestoredAt(saved.savedAt);
     }
+    setHistory(historySummary());
   }, []);
 
   useEffect(() => {
@@ -101,9 +109,17 @@ export default function Page() {
   async function review() {
     setBusy(true);
     setError(null);
+
+    // A review makes several upstream calls, some to a rate-limited free tier.
+    // Without a ceiling the UI sits on "Reviewing…" indefinitely and the user
+    // cannot tell a slow answer from a dead one.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90_000);
+
     try {
       const res = await fetch("/api/review", {
         method: "POST",
+        signal: controller.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           allocation,
@@ -120,17 +136,46 @@ export default function Page() {
                     .map((h) => [h.symbol.trim().toUpperCase(), Number(h.qty)]),
                 )
               : undefined,
-          daysSinceLastRebalance: source === "replay" ? Math.round((bar - seedBar) / 24) : null,
+          // Live runs read staleness from the decision log, so the agent's
+          // "you have not rebalanced in N days" is about this user, not a
+          // replay bar index.
+          daysSinceLastRebalance:
+            source === "replay" ? Math.round((bar - seedBar) / 24) : daysSinceLastRebalance(),
         }),
       });
+
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Review failed.");
-      setProposal(json.proposal as Proposal);
+      if (!res.ok) throw new Error(explain(json.error, res.status));
+
+      const p = json.proposal as Proposal;
+      setProposal(p);
       setSeries((json.series as Record<string, number[]>) ?? {});
+
+      const entry = recordDecision({
+        action: p.timing.action,
+        primaryFactor: p.timing.primaryFactor,
+        driftPp: p.context.portfolio.totalDriftPp,
+        navUsd: p.context.portfolio.navUsd,
+        proposed: p.orderedTrades.length,
+        approved: false,
+        fellBack: Boolean(p.timing.fellBack),
+        reasoning: p.timing.reasoning,
+      });
+      setLastEntryAt(entry.at);
+      setHistory(historySummary());
+
       setScreen("portfolio");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError(
+          "The review took longer than 90 seconds and was stopped. Nothing was sent. " +
+            "If your provider is on a free tier it may be rate-limited — wait a minute and try again.",
+        );
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
+      clearTimeout(timeout);
       setBusy(false);
     }
   }
@@ -227,6 +272,7 @@ export default function Page() {
           onReview={review}
           busy={busy}
           restoredAt={restoredAt}
+          history={history}
           onReset={() => {
             clearSaved();
             setTargets(DEFAULT_TARGETS);
@@ -253,7 +299,13 @@ export default function Page() {
       {screen === "proposal" && proposal && (
         <ProposalView
           proposal={proposal}
-          onApprove={() => setScreen("handoff")}
+          onApprove={() => {
+            // Only an approval resets the staleness clock; a dismissed
+            // proposal rebalanced nothing.
+            if (lastEntryAt) markApproved(lastEntryAt);
+            setHistory(historySummary());
+            setScreen("handoff");
+          }}
           onDismiss={() => setScreen("portfolio")}
         />
       )}
@@ -267,6 +319,25 @@ export default function Page() {
       </footer>
     </main>
   );
+}
+
+/** Upstream errors are for operators; this turns them into a next action. */
+function explain(message: unknown, status: number): string {
+  const text = typeof message === "string" ? message : "Review failed.";
+  if (/rate limit|429|quota/i.test(text)) {
+    return (
+      "The model provider is rate-limited right now — free tiers cap requests per minute and per day. " +
+      "Wait a minute and try again, or switch provider in .env. Nothing was sent."
+    );
+  }
+  if (/no LLM provider/i.test(text)) {
+    return (
+      "No model provider is configured, so the agent cannot form a judgment. " +
+      "The deterministic band rule still works — add a key to .env to enable the rest."
+    );
+  }
+  if (status === 400) return text;
+  return `${text} Nothing was sent to Binance.`;
 }
 
 function Dot({ on }: { on: boolean }) {
@@ -308,6 +379,7 @@ function Allocate(props: {
   onReview: () => void;
   busy: boolean;
   restoredAt: string | null;
+  history: { total: number; holds: number; approved: number };
   onReset: () => void;
 }) {
   const { targets, setTargets, totalWeight, onTarget, validation, ctx } = props;
@@ -689,6 +761,30 @@ function Allocate(props: {
             </div>
           )}
         </div>
+
+        {props.history.total > 0 && (
+          <div className="card card-p">
+            <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>What the agent has done</h2>
+            <div style={{ display: "flex", gap: 18, marginTop: 12 }}>
+              {[
+                { n: props.history.total, l: "reviews" },
+                { n: props.history.holds, l: "held" },
+                { n: props.history.approved, l: "approved" },
+              ].map((x) => (
+                <div key={x.l}>
+                  <div className="m" style={{ fontSize: 19, fontWeight: 700 }}>
+                    {x.n}
+                  </div>
+                  <div className="lbl">{x.l}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "10px 0 0", lineHeight: 1.5 }}>
+              Only an approved rebalance resets the clock the agent reads for staleness — a proposal
+              you dismissed rebalanced nothing.
+            </p>
+          </div>
+        )}
 
         <button
           className="btn btn-primary"
