@@ -123,11 +123,40 @@ function newTally(): Tally {
   return { ok: 0, fell: 0, reasons: [], samples: [] };
 }
 
+/**
+ * A failure caused by quota, network or transport says nothing about the
+ * prompt. Reporting those as "NEEDS PROMPT WORK" sends you to rewrite a prompt
+ * that was never asked — which is exactly what happened on the first run
+ * against an exhausted free-tier key.
+ */
+function isInfrastructure(reason: string): boolean {
+  return /rate limit|quota|HTTP 4\d\d|HTTP 5\d\d|fetch failed|timed out|ECONN|ENOTFOUND|truncated at max_tokens/i.test(
+    reason,
+  );
+}
+
 function report(name: string, t: Tally, n: number) {
-  const rate = ((t.ok / n) * 100).toFixed(0);
-  const verdict = t.fell === 0 ? "clean" : t.fell === 1 ? "acceptable" : "NEEDS PROMPT WORK";
+  const infra = t.reasons.filter(isInfrastructure).length;
+  const judged = n - infra; // calls that actually reached the model and answered
+  const rate = judged > 0 ? ((t.ok / judged) * 100).toFixed(0) : "–";
+
+  const verdict =
+    judged === 0
+      ? "INCONCLUSIVE — no call completed"
+      : t.fell - infra === 0
+        ? "clean"
+        : t.fell - infra === 1
+          ? "acceptable"
+          : "NEEDS PROMPT WORK";
+
   console.log(`\n${name}`);
-  console.log(`  schema-pass ${t.ok}/${n}  (${rate}%)   ${verdict}`);
+  console.log(`  schema-pass ${t.ok}/${judged}  (${rate}%)   ${verdict}`);
+  if (infra > 0) {
+    console.log(
+      `  ${infra}/${n} call(s) never reached a verdict (quota / transport) and are excluded —` +
+        ` these are not prompt failures.`,
+    );
+  }
   if (t.reasons.length) {
     const counts = new Map<string, number>();
     for (const r of t.reasons) counts.set(r, (counts.get(r) ?? 0) + 1);
