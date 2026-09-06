@@ -9,11 +9,10 @@
  * never a number that reaches an order.
  */
 
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-
 import { isMoveInProgress } from "../core/signals";
 import type { RebalanceContext, TimingDecision } from "../types";
-import { MODEL, getClient, hasCredentials, logDecision, samplingFor } from "./client";
+import { logDecision } from "./client";
+import { providerAvailable, structuredCall } from "./provider";
 import { TimingSchema } from "./schemas";
 
 const SYSTEM = `You decide WHEN a portfolio rebalance should happen. You do not compute anything.
@@ -117,24 +116,24 @@ export async function decideTiming(ctx: RebalanceContext): Promise<TimingDecisio
   if (outsideBand.length === 0) {
     return deterministicTiming(ctx, "nothing outside band");
   }
-  if (!hasCredentials()) {
-    return deterministicTiming(ctx, "no ANTHROPIC_API_KEY configured");
+  if (!providerAvailable()) {
+    return deterministicTiming(ctx, "no LLM provider configured");
   }
 
   const facts = buildFacts(ctx, outsideBand);
 
   try {
-    const res = await getClient().messages.parse({
-      model: MODEL,
-      max_tokens: 2000,
+    const res = await structuredCall({
+      schema: TimingSchema,
+      schemaName: "timing_decision",
       system: SYSTEM,
-      ...samplingFor("analytical"),
-      messages: [{ role: "user", content: JSON.stringify(facts, null, 2) }],
-      output_config: { format: zodOutputFormat(TimingSchema) },
+      facts,
+      temperature: 0.2,
+      maxTokens: 2000,
     });
 
-    const parsed = res.parsed_output;
-    if (!parsed) return deterministicTiming(ctx, "model returned no parseable output");
+    if (!res.ok) return deterministicTiming(ctx, res.reason);
+    const parsed = res.value;
 
     // Facts the model does not get to assert: it may only name assets we
     // actually flagged. DESIGN.md §7.1 — "Reject otherwise."

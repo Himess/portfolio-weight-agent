@@ -14,7 +14,8 @@
     "klines": "node --env-file-if-exists=.env --import tsx scripts/fetch-klines.ts",
     "replay": "node --env-file-if-exists=.env --import tsx scripts/replay.ts",
     "mcp:discover": "node --env-file-if-exists=.env --import tsx scripts/discover-mcp-tools.ts",
-    "env:check": "node --env-file-if-exists=.env -e \"const k=process.env.ANTHROPIC_API_KEY;console.log(k?'ANTHROPIC_API_KEY loaded: '+k.slice(0,14)+'...'+k.slice(-4)+' ('+k.length+' chars)':'ANTHROPIC_API_KEY is NOT set — create .env from .env.example');console.log('ANTHROPIC_MODEL:',process.env.ANTHROPIC_MODEL||'claude-sonnet-4-6 (default)')\""
+    "env:check": "node --env-file-if-exists=.env --import tsx scripts/env-check.ts",
+    "llm:check": "node --env-file-if-exists=.env --import tsx scripts/llm-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

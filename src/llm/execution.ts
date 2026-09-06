@@ -7,15 +7,14 @@
  * Anything the model says about size is discarded.
  */
 
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-
 import type {
   CandidateTrade,
   ExecutionDecision,
   OrderedTrade,
   RebalanceContext,
 } from "../types";
-import { MODEL, getClient, hasCredentials, logDecision, samplingFor } from "./client";
+import { logDecision } from "./client";
+import { providerAvailable, structuredCall } from "./provider";
 import { ExecutionSchema } from "./schemas";
 
 const SYSTEM = `You choose how to execute an already-decided set of trades.
@@ -71,8 +70,8 @@ export async function decideExecution(
   if (candidates.length === 0) {
     return { orderedTrades: [], droppedCandidates: [] };
   }
-  if (!hasCredentials()) {
-    return deterministicExecution(candidates, "no ANTHROPIC_API_KEY configured");
+  if (!providerAvailable()) {
+    return deterministicExecution(candidates, "no LLM provider configured");
   }
 
   const facts = {
@@ -97,17 +96,17 @@ export async function decideExecution(
   };
 
   try {
-    const res = await getClient().messages.parse({
-      model: MODEL,
-      max_tokens: 2000,
+    const res = await structuredCall({
+      schema: ExecutionSchema,
+      schemaName: "execution_decision",
       system: SYSTEM,
-      ...samplingFor("analytical"),
-      messages: [{ role: "user", content: JSON.stringify(facts, null, 2) }],
-      output_config: { format: zodOutputFormat(ExecutionSchema) },
+      facts,
+      temperature: 0.2,
+      maxTokens: 2000,
     });
 
-    const parsed = res.parsed_output;
-    if (!parsed) return deterministicExecution(candidates, "model returned no parseable output");
+    if (!res.ok) return deterministicExecution(candidates, res.reason);
+    const parsed = res.value;
 
     const byId = new Map(candidates.map((c) => [c.id, c]));
 

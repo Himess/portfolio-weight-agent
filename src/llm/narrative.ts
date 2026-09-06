@@ -14,10 +14,9 @@
  * the class of figure that could mislead about money.
  */
 
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-
 import type { OrderedTrade, Proposal, RebalanceContext, TimingDecision } from "../types";
-import { MODEL, getClient, hasCredentials, logDecision, samplingFor } from "./client";
+import { logDecision } from "./client";
+import { providerAvailable, structuredCall } from "./provider";
 import { NarrativeSchema } from "./schemas";
 
 const SYSTEM = `You write the two or three sentences a portfolio owner reads when the agent reports back.
@@ -122,7 +121,7 @@ export async function writeNarrative(
   const tokens = buildTokens(ctx, timing, trades);
   const fallback = deterministicNarrative(ctx, timing, trades);
 
-  if (!hasCredentials()) return fallback;
+  if (!providerAvailable()) return fallback;
 
   const facts = {
     action: timing.action,
@@ -138,20 +137,20 @@ export async function writeNarrative(
   };
 
   try {
-    const res = await getClient().messages.parse({
-      model: MODEL,
-      max_tokens: 1200,
+    const res = await structuredCall({
+      schema: NarrativeSchema,
+      schemaName: "narrative",
       system: SYSTEM,
-      ...samplingFor("creative"),
-      messages: [{ role: "user", content: JSON.stringify(facts, null, 2) }],
-      output_config: { format: zodOutputFormat(NarrativeSchema) },
+      facts,
+      temperature: 0.7,
+      maxTokens: 1200,
     });
 
-    const parsed = res.parsed_output;
-    if (!parsed) {
-      logDecision("narrative", "fallback", "no parseable output");
+    if (!res.ok) {
+      logDecision("narrative", "fallback", res.reason);
       return fallback;
     }
+    const parsed = res.value;
 
     const raw = `${parsed.headline}\n\n${parsed.body}`;
 

@@ -104,20 +104,40 @@ npm run klines -- --symbols BTC,ETH,SOL,AVAX --days 365 --out data/window-365d.j
 npm run dev
 ```
 
-**Getting the key.** It comes from the Anthropic **Console**
-(<https://console.anthropic.com/settings/keys> → Create Key), which is a separate account from a
-claude.ai Pro/Max subscription — a subscription does not include API access, and the Console account
-needs its own credit. The key looks like `sk-ant-api03-…`.
+### The judgment layer runs on any provider — including free ones
 
-Put it in `.env` at the repo root:
+The four decisions all have the same shape: a system prompt plus precomputed JSON facts in, schema-
+conforming JSON out. Nothing about that needs a specific vendor, so `src/llm/provider.ts` is the only
+file that names one. Set **one** key in `.env`:
 
+| Provider | Cost | Key |
+|---|---|---|
+| **Google Gemini** | **free tier, no card** — Flash models, ~15 req/min, ~1500/day | <https://aistudio.google.com/apikey> |
+| Groq | free tier | <https://console.groq.com/keys> |
+| OpenRouter | some models free (`:free` suffix) | <https://openrouter.ai/keys> |
+| Anthropic | paid — what DESIGN.md specifies | <https://console.anthropic.com/settings/keys> |
+| Ollama | free, local | no key; set `LLM_BASE_URL=http://localhost:11434/v1` |
+
+A review costs four calls, so the free tiers are ample. Everything except Anthropic goes through the
+OpenAI-compatible backend, so any other compatible endpoint works too.
+
+> A claude.ai Pro/Max subscription does **not** include API access — the Anthropic Console is a
+> separate account with its own credit. Running the app on a server does not change that: where the
+> code runs does not determine which credentials you are licensed to use.
+
+```bash
+npm run env:check            # which provider resolved, key masked
+npm run llm:check -- --n 10  # 10 calls per decision, reports the schema-pass rate
 ```
-ANTHROPIC_API_KEY=sk-ant-api03-...
-```
+
+`llm:check` is the measurement that matters. Whatever the provider returns is validated against the
+zod schema *and* against facts the model does not get to assert; anything that fails becomes a
+labelled deterministic fallback. A decision falling back more than about once in ten means the prompt
+needs work — that is a prompt problem, not a safety problem, because a bad response can never reach
+an order.
 
 `.env` is gitignored. Next.js loads it automatically; the `tsx` scripts load it via
-`--env-file-if-exists`, which is why `npm run replay` sees the key too. `npm run env:check` prints a
-masked confirmation if you are unsure.
+`--env-file-if-exists`, which is why `npm run replay` and `npm run llm:check` see it too.
 
 Open http://localhost:3000. Four screens: set allocation → portfolio → proposal → confirmation handoff.
 

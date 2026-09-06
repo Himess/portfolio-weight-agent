@@ -15,11 +15,10 @@
  * re-resolves on its own. Silent membership changes would destroy trust.
  */
 
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-
 import { normalizeMemberWeights } from "../core/allocation";
 import type { BasketResolution } from "../types";
-import { MODEL, getClient, hasCredentials, logDecision, samplingFor } from "./client";
+import { logDecision } from "./client";
+import { providerAvailable, structuredCall } from "./provider";
 import { BasketSchema } from "./schemas";
 
 const SYSTEM = `You turn a category a person typed into a concrete basket of tradable crypto assets.
@@ -65,8 +64,8 @@ export type BasketInput = {
 };
 
 export async function resolveBasket(input: BasketInput): Promise<BasketResolution> {
-  if (!hasCredentials()) {
-    return failed("no ANTHROPIC_API_KEY configured — enter the basket members manually");
+  if (!providerAvailable()) {
+    return failed("no LLM provider configured — enter the basket members manually");
   }
 
   const universe = [...input.tradable]
@@ -85,17 +84,17 @@ export async function resolveBasket(input: BasketInput): Promise<BasketResolutio
   };
 
   try {
-    const res = await getClient().messages.parse({
-      model: MODEL,
-      max_tokens: 3000,
+    const res = await structuredCall({
+      schema: BasketSchema,
+      schemaName: "basket_resolution",
       system: SYSTEM,
-      ...samplingFor("analytical"),
-      messages: [{ role: "user", content: JSON.stringify(facts, null, 2) }],
-      output_config: { format: zodOutputFormat(BasketSchema) },
+      facts,
+      temperature: 0.2,
+      maxTokens: 3000,
     });
 
-    const parsed = res.parsed_output;
-    if (!parsed) return failed("model returned no parseable output");
+    if (!res.ok) return failed(res.reason);
+    const parsed = res.value;
 
     // Rule 1 — symbol existence is ours to decide, not the model's.
     const dropped: { symbol: string; why: string }[] = [];

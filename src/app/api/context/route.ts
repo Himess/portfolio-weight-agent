@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { listDatasets, llmAvailable, loadDataset, publicAdapter } from "@/server/session";
+import { listDatasets, llmAvailable, loadDataset, providerLabel, publicAdapter } from "@/server/session";
 
 export const runtime = "nodejs";
 
@@ -21,7 +21,7 @@ export async function GET() {
 
   return NextResponse.json({
     llmAvailable: llmAvailable(),
-    model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+    model: providerLabel(),
     datasets,
     replay: first
       ? {

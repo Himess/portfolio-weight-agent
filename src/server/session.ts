@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { PublicAdapter } from "../adapters/public";
 import { ReplayAdapter, type ReplayDataset } from "../adapters/replay";
-import { hasCredentials } from "../llm/client";
+import { providerAvailable, resolveProvider } from "../llm/provider";
 import type { AdapterStatus } from "../adapters/types";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
@@ -72,5 +72,10 @@ export function statusFor(kind: "public" | "replay"): AdapterStatus {
 }
 
 export function llmAvailable(): boolean {
-  return hasCredentials();
+  return providerAvailable();
+}
+
+/** Human-readable description of whichever provider is configured. */
+export function providerLabel(): string {
+  return resolveProvider().label;
 }
