@@ -278,6 +278,53 @@ Two notes worth having in writing, because both caused a real bug during the bui
 
 ---
 
+## Does the judgment actually beat the threshold?
+
+Everything above asserts that deciding *when* to rebalance beats rebalancing
+whenever a band is crossed. `npm run backtest` measures it: three strategies,
+identical data, identical check points, identical cost model.
+
+```bash
+npm run backtest -- --no-llm                                    # hold vs threshold, instant
+npm run backtest -- --every 168 --band-floor 1.0 --band-rel 0.12  # all three
+```
+
+One real year of BTC/ETH/SOL/AVAX (2025-09 → 2026-09), $100k start, weekly
+checks, a tight mandate (bands of max(1.0pp, 12% of target)) — because wide
+bands only trigger a handful of times a year and leave judgment almost nothing
+to decide:
+
+| | avg \|drift\| | cost paid | trades | final NAV |
+|---|---|---|---|---|
+| hold (never rebalance) | 10.46pp | $0.00 | 0 | $61,311 |
+| threshold bot | 2.88pp | $27.74 | 11 | $60,230 |
+| **agent** | **2.90pp** | **$21.57** | **10** | $60,070 |
+
+**Same tracking, 22% less cost.** The agent held the portfolio just as close to
+target (2.90pp vs 2.88pp — a rounding difference) while paying $6.17 less to do
+it. It declined twice where the bot traded, and judgment ran at all 10 decision
+points with zero fallbacks, so this is the model's record and not the band
+rule's wearing its name.
+
+Read that scorecard in order. Rebalancing is not a return-maximising strategy,
+so "which made more money" over one window is mostly the market: the $161 NAV
+gap is 0.27%, noise. What rebalancing is *for* is holding a portfolio near its
+target at an acceptable cost, which is why tracking and cost come first.
+
+Two things worth saying plainly:
+
+- **The honest result is "cheaper for the same tracking", not "more money".**
+  Anyone claiming a rebalancing agent beats the market over one year is reading
+  luck.
+- **The threshold bot lost to doing nothing** ($60,230 vs $61,311). In a falling
+  market, disciplined rebalancing into the fall costs money — which is the real
+  argument for a strategy that can decline, and also a warning against reading
+  any single window as proof.
+
+Full output in `docs/backtest.json`.
+
+---
+
 ## Architecture
 
 ```

@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-09-06T20:43:04.410Z",
+  "ranAt": "2026-09-06T20:46:09.393Z",
   "dataset": "window-365d.json",
   "bands": {
     "absoluteFloorPp": 1,
@@ -55,7 +55,8 @@
       "finalNavUsd": 61311,
       "holds": 0,
       "declinedWhileBandBreached": 0,
-      "llmFallbacks": 0
+      "decisionPoints": 0,
+      "fallbacksAtDecisionPoints": 0
     },
     {
       "strategy": "threshold",
@@ -65,7 +66,8 @@
       "finalNavUsd": 60230,
       "holds": 0,
       "declinedWhileBandBreached": 0,
-      "llmFallbacks": 0
+      "decisionPoints": 0,
+      "fallbacksAtDecisionPoints": 0
     },
     {
       "strategy": "agent",
@@ -75,7 +77,8 @@
       "finalNavUsd": 60070,
       "holds": 44,
       "declinedWhileBandBreached": 2,
-      "llmFallbacks": 42
+      "decisionPoints": 10,
+      "fallbacksAtDecisionPoints": 0
     }
   ]
 }
