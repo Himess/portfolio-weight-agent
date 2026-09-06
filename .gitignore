@@ -12,3 +12,8 @@ data/*.json
 
 # Replay journals are run output
 data/replay-journal.json
+
+.vercel
+
+# The demo slice is committed so a deployment has a replay source
+!data/demo-window.json

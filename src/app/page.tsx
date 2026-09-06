@@ -92,7 +92,17 @@ export default function Page() {
       .then((r) => r.json())
       .then((c: Ctx) => {
         setCtx(c);
-        if (!c.replay) setSource("public");
+        if (!c.replay) {
+          setSource("public");
+          return;
+        }
+        // Datasets differ in length — the committed demo slice is far shorter
+        // than a full capture — so the default review point is chosen from what
+        // is actually loaded. Bar 393 is the captured HOLD; when the window
+        // contains it, start there, because that is the scene worth seeing.
+        const last = Math.max(0, c.replay.bars - 1);
+        setBar(c.replay.bars > 420 ? 393 : last);
+        setSeedBar(Math.min(30, last));
       })
       .catch(() => setError("Could not load context."));
   }, []);
