@@ -32,10 +32,36 @@ export function badRequest(message: string): NextResponse<ApiError> {
 }
 
 /**
+ * Which upstream actually failed.
+ *
+ * Everything used to be reported as Binance, which was true when Binance was
+ * the only upstream. It is not any more: a Telegram 401 announced as "Binance
+ * returned HTTP 401" sends someone to check the wrong credential entirely.
+ * The error carries its URL, so the message can simply say who answered.
+ */
+function upstreamName(url: string): string {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return "the upstream service";
+  }
+  if (host.endsWith("telegram.org")) return "Telegram";
+  if (host.includes("binance")) return "Binance";
+  if (host.includes("googleapis") || host.includes("anthropic") || host.includes("openai")) {
+    return "the model provider";
+  }
+  if (host.includes("upstash")) return "the watch store";
+  return host;
+}
+
+/**
  * Map a thrown error onto a status the client can act on.
  *
- * Every message here ends up in front of a user, so it says what happened and
- * what to do — and, for anything that touches trading, that nothing was sent.
+ * Every message here ends up in front of a user, so it says what happened, who
+ * it happened with, and what to do. "No order was placed" is stated rather than
+ * implied: this app never places one directly, and a user reading an error
+ * about their portfolio should not have to wonder.
  */
 export function failure(err: unknown, context: string): NextResponse<ApiError> {
   if (err instanceof ZodError) {
@@ -45,7 +71,7 @@ export function failure(err: unknown, context: string): NextResponse<ApiError> {
   if (err instanceof TimeoutError) {
     return NextResponse.json(
       {
-        error: `${context} timed out waiting for Binance. Nothing was sent. Try again in a moment.`,
+        error: `${context} timed out waiting for ${upstreamName(err.url)}. No order was placed. Try again in a moment.`,
         code: "upstream_timeout" as const,
         retryable: true,
       },
@@ -54,10 +80,11 @@ export function failure(err: unknown, context: string): NextResponse<ApiError> {
   }
 
   if (err instanceof HttpError) {
+    const who = upstreamName(err.url);
     if (err.status === 429) {
       return NextResponse.json(
         {
-          error: `Binance is rate-limiting requests right now. Nothing was sent. Wait a minute and try again.`,
+          error: `${who} is rate-limiting requests right now. No order was placed. Wait a minute and try again.`,
           code: "rate_limited" as const,
           retryable: true,
         },
@@ -66,7 +93,7 @@ export function failure(err: unknown, context: string): NextResponse<ApiError> {
     }
     return NextResponse.json(
       {
-        error: `${context} failed: Binance returned HTTP ${err.status}. Nothing was sent.`,
+        error: `${context} failed: ${who} returned HTTP ${err.status}. No order was placed.`,
         code: "upstream_unavailable" as const,
         retryable: err.status >= 500,
       },
@@ -87,7 +114,7 @@ export function failure(err: unknown, context: string): NextResponse<ApiError> {
   console.error(`[api] ${context}:`, err);
   return NextResponse.json(
     {
-      error: `${context} failed. Nothing was sent to Binance.`,
+      error: `${context} failed. No order was placed.`,
       code: "internal" as const,
       retryable: false,
     },

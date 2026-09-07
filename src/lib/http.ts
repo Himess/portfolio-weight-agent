@@ -37,9 +37,21 @@ export type FetchOptions = {
   backoffMs?: number;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  method?: "GET" | "POST" | "PUT" | "DELETE";
+  /** Serialised body. Callers set their own Content-Type. */
+  body?: string;
 };
 
 const DEFAULTS = { timeoutMs: 10_000, retries: 2, backoffMs: 300 };
+
+/**
+ * A GET can be repeated safely; a POST cannot. Retrying a timed-out
+ * sendMessage is how one alert becomes three, so anything that writes gets one
+ * attempt unless the caller explicitly asks for more.
+ */
+function defaultRetries(method: string | undefined): number {
+  return method && method !== "GET" ? 0 : DEFAULTS.retries;
+}
 
 export function isRetryable(err: unknown): boolean {
   if (err instanceof TimeoutError) return true;
@@ -52,7 +64,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function fetchText(url: string, options: FetchOptions = {}): Promise<string> {
   const timeoutMs = options.timeoutMs ?? DEFAULTS.timeoutMs;
-  const retries = options.retries ?? DEFAULTS.retries;
+  const retries = options.retries ?? defaultRetries(options.method);
   const backoffMs = options.backoffMs ?? DEFAULTS.backoffMs;
 
   let lastError: unknown;
@@ -67,6 +79,8 @@ export async function fetchText(url: string, options: FetchOptions = {}): Promis
 
     try {
       const res = await fetch(url, {
+        method: options.method,
+        body: options.body,
         signal: controller.signal,
         headers: { Accept: "application/json", ...options.headers },
       });
