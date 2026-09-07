@@ -174,7 +174,15 @@ export function ProposalView({
                 <span className="m">{qty(t.qty)}</span> {t.symbol}
               </div>
               <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3 }}>
-                {t.method.replace("_", " ")} · {t.pair}
+                {/*
+                  A limit order is a different instruction from a market order
+                  and the offset is the whole of it. "spot limit" alone told the
+                  reader nothing about where it would rest.
+                */}
+                {t.method === "spot_limit"
+                  ? `limit, ${t.limitPriceOffsetBps}bps inside`
+                  : t.method.replace("_", " ")}{" "}
+                · {t.pair}
               </div>
             </div>
             <div className="m" style={{ fontSize: 14.5, fontWeight: 600, minWidth: 90 }}>

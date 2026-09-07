@@ -44,6 +44,57 @@ export function declinedTrades(
   return candidates.filter((c) => !going.has(`${c.side}:${c.symbol}`));
 }
 
+/**
+ * What the measured book says the execution method should be.
+ *
+ * Not the model's arithmetic. The prompt described when a resting order beats
+ * crossing the spread, and a small model read a 13.9bps slippage figure and
+ * chose market anyway — the rule was there and simply not weighed. So the
+ * comparison is done here and handed over as a suggestion the model may
+ * override with a reason, which is the same shape as every other decision in
+ * this project: precomputed options, model selects.
+ *
+ * The trade-off is real in both directions. Crossing costs `slippageBps`, now
+ * and for certain. Resting saves most of that and risks not filling at all,
+ * which leaves the drift in place — so on a deep book, where crossing costs
+ * about as much as the spread on a bus fare, waiting buys nothing.
+ */
+export const LIMIT_WORTH_IT_BPS = 8;
+
+export function suggestMethod(c: Pick<CandidateTrade, "slippageBps" | "bookExhausted">): {
+  method: "spot_market" | "spot_limit";
+  limitPriceOffsetBps: number;
+  because: string;
+} {
+  const slip = Math.abs(c.slippageBps);
+
+  if (c.bookExhausted) {
+    // Nothing on the book at this size. Crossing would take whatever price is
+    // left, which is the one case where fill risk is the lesser problem.
+    return {
+      method: "spot_limit",
+      limitPriceOffsetBps: 10,
+      because: "the book was exhausted at this size",
+    };
+  }
+
+  if (slip < LIMIT_WORTH_IT_BPS) {
+    return {
+      method: "spot_market",
+      limitPriceOffsetBps: 0,
+      because: `crossing costs only ${slip.toFixed(1)}bps`,
+    };
+  }
+
+  // Rest inside the touch by about half of what crossing would cost: enough to
+  // be worth doing, close enough to still fill.
+  return {
+    method: "spot_limit",
+    limitPriceOffsetBps: Math.min(50, Math.round(slip / 2)),
+    because: `crossing costs ${slip.toFixed(1)}bps on a thin book`,
+  };
+}
+
 /** Decimal places implied by a step/tick size, e.g. 0.001 -> 3. */
 export function precisionOf(step: number): number {
   if (!Number.isFinite(step) || step <= 0) return 8;

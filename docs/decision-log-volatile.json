@@ -1,0 +1,228 @@
+{
+  "ranAt": "2026-09-07T13:08:32.894Z",
+  "dataset": "demo-volatile.json",
+  "provider": "Gemini (free tier) · gemini-flash-lite-latest",
+  "tracking": "balanced",
+  "bands": {
+    "absoluteFloorPp": 0.7,
+    "relativeBandPct": 0.06,
+    "absoluteCapPp": 1.5
+  },
+  "checkedEveryBars": 24,
+  "startNavUsd": 100000,
+  "allocation": {
+    "cashSymbol": "USDT",
+    "targets": [
+      {
+        "kind": "asset",
+        "symbol": "BTC",
+        "weight": 0.3
+      },
+      {
+        "kind": "asset",
+        "symbol": "ETH",
+        "weight": 0.15
+      },
+      {
+        "kind": "asset",
+        "symbol": "SUI",
+        "weight": 0.15
+      },
+      {
+        "kind": "asset",
+        "symbol": "TAO",
+        "weight": 0.15
+      },
+      {
+        "kind": "asset",
+        "symbol": "WLD",
+        "weight": 0.15
+      },
+      {
+        "kind": "asset",
+        "symbol": "USDT",
+        "weight": 0.1
+      }
+    ]
+  },
+  "note": "Every check where something was outside its band, in order, with fills applied so each decision changes what the next one sees. Checks with nothing outside a band are omitted: the agent was never asked, and logging them as HOLDs would pad the record with silence.",
+  "summary": {
+    "decisionPoints": 9,
+    "holds": 0,
+    "partials": 0,
+    "rebalances": 9,
+    "usedFallback": 0,
+    "distinctHoldReasons": [],
+    "totalCostUsd": 23.07
+  },
+  "entries": [
+    {
+      "bar": 388,
+      "date": "2026-03-25",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.75,
+      "navUsd": 105227.62,
+      "outsideBand": [
+        "TAO"
+      ],
+      "actedOn": [
+        "TAO"
+      ],
+      "declined": [],
+      "reason": "TAO has crossed its tolerance band after a strong upward move, bringing its weight well above target.",
+      "costUsd": 3.48,
+      "fellBack": false
+    },
+    {
+      "bar": 436,
+      "date": "2026-03-27",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 3.36,
+      "navUsd": 96492.65,
+      "outsideBand": [
+        "WLD"
+      ],
+      "actedOn": [
+        "WLD"
+      ],
+      "declined": [],
+      "reason": "WLD has crossed its tolerance band and fallen notably over the past day.",
+      "costUsd": 1.64,
+      "fellBack": false
+    },
+    {
+      "bar": 484,
+      "date": "2026-03-29",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2,
+      "navUsd": 96091,
+      "outsideBand": [
+        "SUI"
+      ],
+      "actedOn": [
+        "SUI"
+      ],
+      "declined": [],
+      "reason": "SUI has crossed its tolerance band while the rest of the portfolio remains stable.",
+      "costUsd": 1.07,
+      "fellBack": false
+    },
+    {
+      "bar": 676,
+      "date": "2026-04-06",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.68,
+      "navUsd": 98066.31,
+      "outsideBand": [
+        "WLD"
+      ],
+      "actedOn": [
+        "WLD"
+      ],
+      "declined": [],
+      "reason": "WLD has crossed its tolerance band and drifted notably from its target weight.",
+      "costUsd": 1.52,
+      "fellBack": false
+    },
+    {
+      "bar": 772,
+      "date": "2026-04-10",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 3.66,
+      "navUsd": 98455.21,
+      "outsideBand": [
+        "TAO",
+        "SUI"
+      ],
+      "actedOn": [
+        "SUI",
+        "TAO"
+      ],
+      "declined": [],
+      "reason": "TAO and SUI have both crossed their tolerance bands and accumulated significant drift.",
+      "costUsd": 4.94,
+      "fellBack": false
+    },
+    {
+      "bar": 796,
+      "date": "2026-04-11",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.98,
+      "navUsd": 99671.17,
+      "outsideBand": [
+        "WLD"
+      ],
+      "actedOn": [
+        "WLD"
+      ],
+      "declined": [],
+      "reason": "WLD has crossed its tolerance band while volatility remains stable.",
+      "costUsd": 1.42,
+      "fellBack": false
+    },
+    {
+      "bar": 844,
+      "date": "2026-04-13",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.18,
+      "navUsd": 99260.12,
+      "outsideBand": [
+        "WLD"
+      ],
+      "actedOn": [
+        "WLD"
+      ],
+      "declined": [],
+      "reason": "WLD has crossed its tolerance band as it continues to climb.",
+      "costUsd": 1.64,
+      "fellBack": false
+    },
+    {
+      "bar": 868,
+      "date": "2026-04-14",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.26,
+      "navUsd": 102286.85,
+      "outsideBand": [
+        "TAO",
+        "ETH"
+      ],
+      "actedOn": [
+        "ETH",
+        "TAO"
+      ],
+      "declined": [],
+      "reason": "Both Ethereum and TAO have crossed their tolerance bands, and the overall drift is real.",
+      "costUsd": 3.19,
+      "fellBack": false
+    },
+    {
+      "bar": 964,
+      "date": "2026-04-18",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.12,
+      "navUsd": 101569.38,
+      "outsideBand": [
+        "BTC",
+        "WLD"
+      ],
+      "actedOn": [
+        "BTC",
+        "WLD"
+      ],
+      "declined": [],
+      "reason": "Both Bitcoin and Worldcoin have crossed their tolerance bands after several days without a rebalance.",
+      "costUsd": 4.17,
+      "fellBack": false
+    }
+  ]
+}

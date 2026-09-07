@@ -187,6 +187,50 @@ export function computeDrift(
 }
 
 /**
+ * Is this someone entering, rather than someone correcting?
+ *
+ * The case the product was built blind to. A person holding only cash who sets
+ * 50/30/20 has ~80pp of drift, every risk leg is unfunded, and every band is
+ * breached by a mile. A threshold rule buys the whole portfolio in one minute,
+ * which is not rebalancing — it is committing everything at a single price and
+ * calling it discipline. Whether that minute was a good one is unknowable, and
+ * unknowable is exactly the thing this agent is supposed to refuse to pretend
+ * about.
+ *
+ * Detected deterministically so the model is told, not asked to notice: cash
+ * well above its own target, and most risk legs holding almost nothing against
+ * theirs.
+ */
+export type EntryShape = {
+  initialEntry: boolean;
+  /** Targets funded at less than a tenth of their weight. */
+  unfundedSymbols: string[];
+  /** How far cash sits above its own target, in percentage points. */
+  cashOverPp: number;
+};
+
+export function entryShape(state: PortfolioState, cashSymbol: string): EntryShape {
+  const cash = state.rows.find((r) => r.symbol === cashSymbol);
+  const risk = state.rows.filter((r) => r.symbol !== cashSymbol && r.targetWeight > 0);
+
+  const unfundedSymbols = risk
+    .filter((r) => r.currentWeight < r.targetWeight * 0.1)
+    .map((r) => r.symbol);
+
+  const cashOverPp = cash ? cash.driftPp : 0;
+
+  return {
+    // Both conditions, because either alone is something else: a big cash
+    // overweight with funded legs is ordinary drift, and one unfunded leg is a
+    // position someone just added.
+    initialEntry:
+      cashOverPp > 25 && risk.length > 0 && unfundedSymbols.length >= Math.ceil(risk.length / 2),
+    unfundedSymbols,
+    cashOverPp: Number(cashOverPp.toFixed(2)),
+  };
+}
+
+/**
  * Total drift that would remain after a set of trades executes at their
  * estimated prices. Used for driftReductionPp in §6.
  */

@@ -1,0 +1,404 @@
+{
+  "ranAt": "2026-09-07T13:04:14.966Z",
+  "dataset": "window-365d.json",
+  "provider": "Gemini (free tier) · gemini-flash-lite-latest",
+  "tracking": "balanced",
+  "bands": {
+    "absoluteFloorPp": 0.7,
+    "relativeBandPct": 0.06,
+    "absoluteCapPp": 1.5
+  },
+  "checkedEveryBars": 336,
+  "startNavUsd": 100000,
+  "allocation": {
+    "cashSymbol": "USDT",
+    "targets": [
+      {
+        "kind": "asset",
+        "symbol": "BTC",
+        "weight": 0.4
+      },
+      {
+        "kind": "asset",
+        "symbol": "ETH",
+        "weight": 0.2
+      },
+      {
+        "kind": "basket",
+        "label": "L1s",
+        "weight": 0.3,
+        "members": [
+          {
+            "symbol": "SOL",
+            "weight": 0.5
+          },
+          {
+            "symbol": "AVAX",
+            "weight": 0.5
+          }
+        ],
+        "resolvedAt": "2026-01-01T00:00:00.000Z",
+        "rationale": "Large-cap alternative layer-1s, equally weighted."
+      },
+      {
+        "kind": "asset",
+        "symbol": "USDT",
+        "weight": 0.1
+      }
+    ]
+  },
+  "note": "Every check where something was outside its band, in order, with fills applied so each decision changes what the next one sees. Checks with nothing outside a band are omitted: the agent was never asked, and logging them as HOLDs would pad the record with silence.",
+  "summary": {
+    "decisionPoints": 18,
+    "holds": 0,
+    "partials": 1,
+    "rebalances": 17,
+    "usedFallback": 0,
+    "distinctHoldReasons": [],
+    "totalCostUsd": 30.46
+  },
+  "entries": [
+    {
+      "bar": 672,
+      "date": "2025-10-04",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.19,
+      "navUsd": 99682.15,
+      "outsideBand": [
+        "BTC",
+        "AVAX"
+      ],
+      "actedOn": [
+        "BTC",
+        "AVAX"
+      ],
+      "declined": [],
+      "reason": "Both Bitcoin and Avalanche have crossed their tolerance bands after two weeks without a rebalance.",
+      "costUsd": 4.3,
+      "fellBack": false
+    },
+    {
+      "bar": 1008,
+      "date": "2025-10-18",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 4.39,
+      "navUsd": 84873.09,
+      "outsideBand": [
+        "AVAX",
+        "BTC",
+        "SOL"
+      ],
+      "actedOn": [
+        "BTC",
+        "AVAX",
+        "SOL"
+      ],
+      "declined": [],
+      "reason": "Several positions have crossed their tolerance thresholds over the past two weeks.",
+      "costUsd": 5.78,
+      "fellBack": false
+    },
+    {
+      "bar": 1344,
+      "date": "2025-11-01",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.64,
+      "navUsd": 85012.37,
+      "outsideBand": [
+        "BTC",
+        "AVAX"
+      ],
+      "actedOn": [
+        "BTC",
+        "AVAX"
+      ],
+      "declined": [],
+      "reason": "Both Bitcoin and Avalanche have crossed their tolerance bands after two weeks without a rebalance.",
+      "costUsd": 2.4,
+      "fellBack": false
+    },
+    {
+      "bar": 1680,
+      "date": "2025-11-15",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.04,
+      "navUsd": 72617.1,
+      "outsideBand": [
+        "SOL"
+      ],
+      "actedOn": [
+        "SOL"
+      ],
+      "declined": [],
+      "reason": "Solana has crossed its tolerance threshold after drifting for two weeks.",
+      "costUsd": 1.36,
+      "fellBack": false
+    },
+    {
+      "bar": 2352,
+      "date": "2025-12-13",
+      "verdict": "REBALANCE",
+      "primaryFactor": "staleness",
+      "totalDriftPp": 1.65,
+      "navUsd": 67954.58,
+      "outsideBand": [
+        "AVAX"
+      ],
+      "actedOn": [
+        "AVAX"
+      ],
+      "declined": [],
+      "reason": "AVAX has drifted well past its tolerance band and it has been nearly a month since our last rebalance.",
+      "costUsd": 1.25,
+      "fellBack": false
+    },
+    {
+      "bar": 2688,
+      "date": "2025-12-27",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.59,
+      "navUsd": 65018.11,
+      "outsideBand": [
+        "BTC"
+      ],
+      "actedOn": [
+        "BTC"
+      ],
+      "declined": [],
+      "reason": "Bitcoin has crossed its tolerance band after two weeks without a rebalance.",
+      "costUsd": 1.15,
+      "fellBack": false
+    },
+    {
+      "bar": 3360,
+      "date": "2026-01-24",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.22,
+      "navUsd": 65693.72,
+      "outsideBand": [
+        "AVAX"
+      ],
+      "actedOn": [
+        "AVAX"
+      ],
+      "declined": [],
+      "reason": "AVAX has drifted outside its tolerance band as it has gradually declined over the past month.",
+      "costUsd": 0.82,
+      "fellBack": false
+    },
+    {
+      "bar": 3696,
+      "date": "2026-02-07",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 3.16,
+      "navUsd": 50735.67,
+      "outsideBand": [
+        "SOL"
+      ],
+      "actedOn": [
+        "SOL"
+      ],
+      "declined": [],
+      "reason": "Solana has drifted past its tolerance threshold and is ready for correction.",
+      "costUsd": 1,
+      "fellBack": false
+    },
+    {
+      "bar": 4032,
+      "date": "2026-02-21",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.2,
+      "navUsd": 49776.39,
+      "outsideBand": [
+        "ETH"
+      ],
+      "actedOn": [
+        "ETH"
+      ],
+      "declined": [],
+      "reason": "Ethereum has drifted past its tolerance level over the past two weeks without any ongoing wild moves.",
+      "costUsd": 1.26,
+      "fellBack": false
+    },
+    {
+      "bar": 5376,
+      "date": "2026-04-18",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 3.8,
+      "navUsd": 53635.76,
+      "outsideBand": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "actedOn": [
+        "BTC",
+        "ETH",
+        "SOL"
+      ],
+      "declined": [],
+      "reason": "Bitcoin, Ethereum, and Solana have all crossed their tolerances and drifted noticeably over the past eight weeks.",
+      "costUsd": 3.25,
+      "fellBack": false
+    },
+    {
+      "bar": 5712,
+      "date": "2026-05-02",
+      "verdict": "REBALANCE",
+      "primaryFactor": "staleness",
+      "totalDriftPp": 1.93,
+      "navUsd": 53940.8,
+      "outsideBand": [
+        "BTC",
+        "AVAX"
+      ],
+      "actedOn": [
+        "BTC",
+        "AVAX"
+      ],
+      "declined": [],
+      "reason": "Bitcoin and Avalanche have both crossed their tolerance bands after two weeks without a rebalance.",
+      "costUsd": 1.53,
+      "fellBack": false
+    },
+    {
+      "bar": 6048,
+      "date": "2026-05-16",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.43,
+      "navUsd": 53689.28,
+      "outsideBand": [
+        "ETH"
+      ],
+      "actedOn": [
+        "ETH"
+      ],
+      "declined": [],
+      "reason": "Ethereum has drifted past its allowed tolerance over the past two weeks and now sits notably below its target weight.",
+      "costUsd": 0.92,
+      "fellBack": false
+    },
+    {
+      "bar": 6720,
+      "date": "2026-06-13",
+      "verdict": "REBALANCE",
+      "primaryFactor": "staleness",
+      "totalDriftPp": 2.47,
+      "navUsd": 43277.63,
+      "outsideBand": [
+        "AVAX"
+      ],
+      "actedOn": [
+        "AVAX"
+      ],
+      "declined": [],
+      "reason": "AVAX has drifted outside its tolerance band after weeks without a rebalance.",
+      "costUsd": 0.67,
+      "fellBack": false
+    },
+    {
+      "bar": 7056,
+      "date": "2026-06-27",
+      "verdict": "REBALANCE",
+      "primaryFactor": "staleness",
+      "totalDriftPp": 1.73,
+      "navUsd": 42034.37,
+      "outsideBand": [
+        "ETH"
+      ],
+      "actedOn": [
+        "ETH"
+      ],
+      "declined": [],
+      "reason": "Ethereum has drifted past its tolerance band and remained there for two weeks.",
+      "costUsd": 0.67,
+      "fellBack": false
+    },
+    {
+      "bar": 7392,
+      "date": "2026-07-11",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.55,
+      "navUsd": 45117.27,
+      "outsideBand": [
+        "ETH",
+        "SOL"
+      ],
+      "actedOn": [
+        "ETH",
+        "SOL"
+      ],
+      "declined": [],
+      "reason": "Both Ethereum and Solana have crossed their tolerance bands after two weeks without a rebalance.",
+      "costUsd": 1.38,
+      "fellBack": false
+    },
+    {
+      "bar": 8064,
+      "date": "2026-08-08",
+      "verdict": "REBALANCE",
+      "primaryFactor": "staleness",
+      "totalDriftPp": 2.13,
+      "navUsd": 45389.96,
+      "outsideBand": [
+        "AVAX",
+        "ETH"
+      ],
+      "actedOn": [
+        "ETH",
+        "AVAX"
+      ],
+      "declined": [],
+      "reason": "Both AVAX and ETH have crossed their respective tolerance bands over the past month.",
+      "costUsd": 1.08,
+      "fellBack": false
+    },
+    {
+      "bar": 8400,
+      "date": "2026-08-22",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.54,
+      "navUsd": 53797.72,
+      "outsideBand": [
+        "ETH"
+      ],
+      "actedOn": [
+        "ETH"
+      ],
+      "declined": [],
+      "reason": "Ethereum has crossed its tolerance band after drifting upward over the past two weeks.",
+      "costUsd": 0.85,
+      "fellBack": false
+    },
+    {
+      "bar": 8736,
+      "date": "2026-09-05",
+      "verdict": "PARTIAL",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.47,
+      "navUsd": 55652.24,
+      "outsideBand": [
+        "SOL"
+      ],
+      "actedOn": [
+        "SOL"
+      ],
+      "declined": [],
+      "reason": "Solana has drifted outside its tolerance band after two weeks without a rebalance.",
+      "costUsd": 0.79,
+      "fellBack": false
+    }
+  ]
+}

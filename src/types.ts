@@ -205,6 +205,12 @@ export type RebalanceContext = {
    * it has already spent.
    */
   askedLast24h?: number;
+  /**
+   * Set when this is someone entering rather than correcting: cash far above
+   * its target with most risk legs unfunded. Computed, not inferred by the
+   * model — see core/drift.ts entryShape.
+   */
+  entry?: { initialEntry: boolean; unfundedSymbols: string[]; cashOverPp: number };
 };
 
 export type Preference = "patient" | "balanced" | "tight" | "continuous";

@@ -17,7 +17,13 @@ import { allocationSymbols } from "./core/allocation";
 import { bandsFor, volScales } from "./core/bands";
 import { DEFAULT_PLAN_CONFIG, declinedTrades, generateCandidates } from "./core/candidates";
 import { computeCostBenefit } from "./core/costbenefit";
-import { MissingPriceError, buildHoldings, computeDrift, unpricedSymbols } from "./core/drift";
+import {
+  MissingPriceError,
+  buildHoldings,
+  computeDrift,
+  entryShape,
+  unpricedSymbols,
+} from "./core/drift";
 import { computeSignals } from "./core/signals";
 import { decideExecution, materializeTrades } from "./llm/execution";
 import { buildProposal, writeNarrative } from "./llm/narrative";
@@ -140,6 +146,7 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
     preference: input.preference,
     cashSymbol,
     askedLast24h: input.askedLast24h,
+    entry: entryShape(portfolio, cashSymbol),
   };
 
   // ---- Decision 1: timing -------------------------------------------------

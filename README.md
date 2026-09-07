@@ -426,6 +426,53 @@ Two notes worth having in writing, because both caused a real bug during the bui
 
 ---
 
+## Forty decision points, and what they actually show
+
+One captured HOLD is an anecdote. `npm run decisions` walks a captured window,
+checks the portfolio on a fixed cadence, runs the full loop at every check that
+finds something outside a band, and **applies the fills** — so each decision
+changes what the next one sees. Three runs are committed:
+
+| Run | Decision points | HOLD | PARTIAL | REBALANCE |
+|---|---|---|---|---|
+| [majors, daily](docs/decision-log.json) | 13 | 0 | 2 | 11 |
+| [majors, fortnightly, a full year](docs/decision-log-fortnightly.json) | 18 | 0 | 1 | 17 |
+| [volatile mix, daily](docs/decision-log-volatile.json) | 9 | 0 | 0 | 9 |
+
+**Zero full HOLDs across forty decision points.** That is the honest headline,
+and it is not what the product's own README expected to find.
+
+The reason is structural rather than disappointing: *if you act on the agent's
+advice, drift never accumulates*. Every breach it corrects is a breach that
+never grows into the situation where waiting matters. The captured HOLD in
+[`hold-example.json`](docs/hold-example.json) is real, and it is on a portfolio
+bought once and **left alone for weeks** — 4.9pp of accumulated drift with AVAX
+still climbing hard. That is a different situation from a portfolio checked
+daily and corrected each time.
+
+What the logs do show is the same judgment expressed at leg level. On
+2025-10-11 both AVAX and BTC were outside their bands; the agent bought BTC and
+**declined AVAX**, `primaryFactor: falling_knife`:
+
+```json
+{ "date": "2025-10-11", "verdict": "PARTIAL", "primaryFactor": "falling_knife",
+  "outsideBand": ["AVAX", "BTC"], "actedOn": ["BTC"], "declined": ["AVAX"],
+  "reason": "Bitcoin has drifted outside its band and can be rebalanced safely today." }
+```
+
+That leg reproduced on a second independent run, same date, same factor. So the
+claim survives, in a narrower and more accurate form than it was first stated:
+
+> The agent declines **legs**, not usually whole checks. "It can wait" shows up
+> as PARTIAL far more often than as HOLD, and a full HOLD needs every breached
+> position to be mid-move at once — which is rare unless drift has been left to
+> build.
+
+Declined trades are therefore a value in the payload, not a claim in prose:
+every proposal carries `declined[]`, sized and priced against real depth.
+
+---
+
 ## Does the judgment actually beat the threshold?
 
 Everything above asserts that deciding *when* to rebalance beats rebalancing

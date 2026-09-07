@@ -8,16 +8,18 @@ import {
 } from "../src/core/allocation";
 import {
   DEFAULT_PLAN_CONFIG,
+  LIMIT_WORTH_IT_BPS,
   declinedTrades,
   deltasFromTrades,
   generateCandidates,
   precisionOf,
   roundDownToStep,
   roundToTick,
+  suggestMethod,
 } from "../src/core/candidates";
 import { REFERENCE_VOL_PCT, bandPpFor, realizedVolPct, volScaleFor, volScales } from "../src/core/bands";
 import { computeCostBenefit } from "../src/core/costbenefit";
-import { bandFor, buildHoldings, computeDrift, computeNav } from "../src/core/drift";
+import { bandFor, buildHoldings, computeDrift, computeNav, entryShape } from "../src/core/drift";
 import { computeSignals, isMoveInProgress, logReturns, stdev } from "../src/core/signals";
 import { midPrice, syntheticBook, walkBookByQty } from "../src/core/slippage";
 import type { Allocation, ExchangeInfo, Kline, OrderBook } from "../src/types";
@@ -695,5 +697,95 @@ describe("declined trades", () => {
     // exist nowhere to compare against. Matching by id reported nothing declined.
     const regenerated = [leg("BUY", "BTC", "t1"), leg("BUY", "ETH", "t2")];
     expect(declinedTrades(candidates, regenerated).map((c) => c.symbol)).toEqual(["AVAX"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Entering vs correcting
+// ---------------------------------------------------------------------------
+
+describe("first entry", () => {
+  const px = { BTC: 100_000, ETH: 4_000, SOL: 200, AVAX: 40 };
+
+  it("recognises someone holding only cash", () => {
+    const state = computeDrift(buildHoldings({ USDT: 100_000 }, px, "USDT"), alloc);
+    const shape = entryShape(state, "USDT");
+    expect(shape.initialEntry).toBe(true);
+    // Every risk leg, not just the big ones.
+    expect(shape.unfundedSymbols.sort()).toEqual(["AVAX", "BTC", "ETH", "SOL"]);
+    expect(shape.cashOverPp).toBeCloseTo(90, 1);
+  });
+
+  it("does not call an ordinary cash overweight an entry", () => {
+    // Funded legs that have drifted are drift, however much cash there is.
+    const state = computeDrift(
+      buildHoldings({ BTC: 0.25, ETH: 3, SOL: 50, AVAX: 250, USDT: 45_000 }, px, "USDT"),
+      alloc,
+    );
+    const shape = entryShape(state, "USDT");
+    expect(shape.cashOverPp).toBeGreaterThan(25);
+    expect(shape.initialEntry).toBe(false);
+  });
+
+  it("does not call one newly added position an entry", () => {
+    // On target except AVAX, which was just added and holds nothing.
+    const state = computeDrift(
+      buildHoldings({ BTC: 0.4, ETH: 5, SOL: 75, USDT: 10_000 }, px, "USDT"),
+      alloc,
+    );
+    const shape = entryShape(state, "USDT");
+    expect(shape.unfundedSymbols).toEqual(["AVAX"]);
+    expect(shape.initialEntry).toBe(false);
+  });
+
+  it("is false for a portfolio sitting on its target", () => {
+    const state = computeDrift(
+      buildHoldings({ BTC: 0.4, ETH: 5, SOL: 75, AVAX: 375, USDT: 10_000 }, px, "USDT"),
+      alloc,
+    );
+    expect(entryShape(state, "USDT").initialEntry).toBe(false);
+  });
+});
+
+describe("execution method from the measured book", () => {
+  it("crosses when crossing is nearly free", () => {
+    const s = suggestMethod({ slippageBps: 1.2, bookExhausted: false });
+    expect(s.method).toBe("spot_market");
+    expect(s.limitPriceOffsetBps).toBe(0);
+    expect(s.because).toContain("1.2bps");
+  });
+
+  it("rests when the book is thin enough for it to matter", () => {
+    const s = suggestMethod({ slippageBps: 13.9, bookExhausted: false });
+    expect(s.method).toBe("spot_limit");
+    // Inside the touch by about half of what crossing would cost: worth doing,
+    // close enough to still fill.
+    expect(s.limitPriceOffsetBps).toBe(7);
+    expect(s.limitPriceOffsetBps).toBeLessThan(13.9);
+  });
+
+  it("switches at the stated threshold, not somewhere near it", () => {
+    expect(suggestMethod({ slippageBps: LIMIT_WORTH_IT_BPS - 0.1, bookExhausted: false }).method).toBe(
+      "spot_market",
+    );
+    expect(suggestMethod({ slippageBps: LIMIT_WORTH_IT_BPS, bookExhausted: false }).method).toBe(
+      "spot_limit",
+    );
+  });
+
+  it("never rests further out than the cap", () => {
+    const s = suggestMethod({ slippageBps: 500, bookExhausted: false });
+    expect(s.limitPriceOffsetBps).toBe(50);
+  });
+
+  it("rests when the book ran out, whatever the measured slippage says", () => {
+    // Nothing left at this size: the walk price is not a price anyone will fill.
+    const s = suggestMethod({ slippageBps: 0.5, bookExhausted: true });
+    expect(s.method).toBe("spot_limit");
+    expect(s.because).toContain("exhausted");
+  });
+
+  it("treats a negative slippage figure by magnitude", () => {
+    expect(suggestMethod({ slippageBps: -20, bookExhausted: false }).method).toBe("spot_limit");
   });
 });

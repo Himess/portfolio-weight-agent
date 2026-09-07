@@ -45,6 +45,23 @@ Choose REBALANCE or PARTIAL when drift is real, the cost is proportionate, and
 the market is not mid-move. Staleness matters too: a portfolio that has drifted
 for many weeks deserves action even at a mediocre cost.
 
+FIRST ENTRY IS NOT A CORRECTION.
+
+When "entry.initialEntry" is true the owner is holding cash and starting, not
+drifting. Every band is breached by a wide margin because nothing has been
+bought yet, and the drift figure is large for a reason that has nothing to do
+with the market moving.
+
+Buying the whole portfolio at once is not discipline, it is committing
+everything at a single price. Whether that price was a good one is unknowable,
+and the drift arithmetic says nothing about it. Prefer PARTIAL: fund the
+steadiest legs now — the largest targets and the calmest assets — and leave the
+ones that are mid-move for later. Say plainly that you are entering in steps
+and why. Choose REBALANCE only if nothing is moving unusually and the owner has
+clearly asked to be fully invested.
+
+Never describe this as drift the market caused. It is not.
+
 ATTENTION IS THE SCARCE RESOURCE, NOT MONEY.
 
 Correcting drift is cheap here — only the deviation is traded, and a year of
@@ -243,6 +260,7 @@ function buildFacts(ctx: RebalanceContext, outsideBand: string[]) {
     preference: ctx.preference,
     askedLast24h: ctx.askedLast24h ?? 0,
     dailyAskBudget: askBudgetFor(ctx.preference),
+    entry: ctx.entry ?? { initialEntry: false, unfundedSymbols: [], cashOverPp: 0 },
     asksRemaining: Math.max(0, askBudgetFor(ctx.preference) - (ctx.askedLast24h ?? 0)),
     navUsd: round(ctx.portfolio.navUsd, 2),
     totalDriftPp: round(ctx.portfolio.totalDriftPp, 3),

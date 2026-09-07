@@ -13,6 +13,7 @@ import type {
   OrderedTrade,
   RebalanceContext,
 } from "../types";
+import { suggestMethod } from "../core/candidates";
 import { logDecision } from "./client";
 import { providerAvailable, structuredCall } from "./provider";
 import { ExecutionSchema } from "./schemas";
@@ -27,23 +28,40 @@ The trades and their quantities are fixed. You may:
 You may NOT change a quantity, invent a trade, or reference an id that is not in
 the candidates list.
 
-Methods:
-- spot_market — immediate fill at the touch. Use when slippage is low and the
-  trade should just get done.
-- spot_limit  — a resting order at an offset. Use when slippageBps is high or the
-  book is thin, and a few basis points are worth waiting for. Set
-  limitPriceOffsetBps to how far inside the touch to sit (positive = more
-  passive, so a BUY sits below mid and a SELL above). Keep it under 50.
-- convert     — Binance Convert. Use for small notionals where the spread is
-  better than crossing a thin book. Set limitPriceOffsetBps to 0.
+Choosing the method is a real decision, and "slippageBps" is what it turns on.
+That figure is measured — the order book was walked to this trade's size — and
+it is what crossing the spread costs right now.
+
+- spot_market — crosses immediately. Right when slippageBps is small: a couple
+  of basis points is cheaper than the risk of not filling, and an unfilled
+  order leaves the drift in place. The common case on a deep book.
+- spot_limit  — rests inside the touch. Right when slippageBps is large, which
+  means a thin book or a size that walks several levels. That slippage is
+  exactly what resting avoids, so there it is real money. limitPriceOffsetBps
+  is how far inside the touch to sit; positive is more passive, so a BUY rests
+  below mid and a SELL above. Keep it well under slippageBps or it will not
+  fill. The cost is fill risk — say so in "why".
+- convert     — Binance Convert. For small notionals where crossing a thin book
+  costs more than Convert's spread. Set limitPriceOffsetBps to 0.
+
+Each candidate carries a "suggested" method computed from its own measured
+book. Follow it unless something about the wider plan argues otherwise —
+funding order, a leg you are dropping, an unusually urgent correction. If you
+deviate, say why in "why". Do not deviate silently.
+
+A plan can mix methods, and usually should when one asset is liquid and another
+is not.
 
 Hard ordering rule: every SELL must come before every BUY. Buys are funded by the
 proceeds of sells, so this is not a preference.
 
 Drop a candidate when its cost is out of proportion to the drift it fixes, or
 when the book was exhausted and the fill would be bad. Explain each drop in one
-short sentence. Use spot_market for everything if nothing suggests otherwise —
-do not manufacture complexity.`;
+short sentence.
+
+"why" is one clause naming the figure that decided it — "book is deep, crossing
+costs almost nothing", "thin book, resting saves most of the spread". Never "as
+per the strategy".`;
 
 /** Deterministic default: take every candidate at market, in the given order. */
 export function deterministicExecution(
@@ -51,12 +69,17 @@ export function deterministicExecution(
   reason: string,
 ): ExecutionDecision {
   return {
-    orderedTrades: candidates.map((c) => ({
-      candidateId: c.id,
-      method: "spot_market" as const,
-      limitPriceOffsetBps: 0,
-      why: "Market order — deterministic default.",
-    })),
+    orderedTrades: candidates.map((c) => {
+      // The book's own answer, so a fallback is not automatically the worse
+      // execution — it simply has no judgment layered on top of the numbers.
+      const s = suggestMethod(c);
+      return {
+        candidateId: c.id,
+        method: s.method,
+        limitPriceOffsetBps: s.limitPriceOffsetBps,
+        why: `${s.because} — deterministic default.`,
+      };
+    }),
     droppedCandidates: [],
     fellBack: true,
     fallbackReason: reason,
@@ -90,8 +113,15 @@ export async function decideExecution(
       estFeeUsd: Number(c.estFeeUsd.toFixed(2)),
       estSlippageUsd: Number(c.estSlippageUsd.toFixed(2)),
       slippageBps: Number(c.slippageBps.toFixed(1)),
+      // Precomputed so it is not arithmetic the model has to do, and would do
+      // badly: what crossing costs against the fee it pays either way.
+      feeBps: Number(((c.estFeeUsd / Math.max(c.estNotionalUsd, 1)) * 10_000).toFixed(1)),
       bookExhausted: c.bookExhausted,
       convertAvailable: true,
+      // What the measured book implies. The prompt described this rule and a
+      // small model read 13.9bps of slippage and chose market anyway, so the
+      // comparison is done here and offered as a choice rather than a sum.
+      suggested: suggestMethod(c),
     })),
   };
 
