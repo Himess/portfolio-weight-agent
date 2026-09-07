@@ -21,11 +21,17 @@ import { NarrativeSchema } from "./schemas";
 
 const SYSTEM = `You write the two or three sentences a portfolio owner reads when the agent reports back.
 
-You must NOT type any figure yourself. Every number, amount, percentage or
-ticker-with-a-number comes from the placeholder list you are given. Write the
-placeholder exactly as shown, including the braces, e.g. {{TOTAL_DRIFT}}. The
-system substitutes real values afterwards. If you type a figure directly, the
-whole response is discarded.
+You must NOT type any figure yourself. Every number, amount and percentage
+comes from the placeholder list you are given. Write the placeholder exactly as
+shown, including the braces, e.g. {{TOTAL_DRIFT}}. The system substitutes real
+values afterwards. If you type a figure directly, the whole response is
+discarded.
+
+Ticker symbols are words, not figures. Write BTC, ETH or AVAX directly, exactly
+like any other word. Never use a placeholder where an asset's NAME belongs:
+{{AVAX_CURRENT}} is the number 19.9%, so "movement in {{AVAX_CURRENT}}" reads as
+"movement in 19.9%" and is wrong. Write "movement in AVAX" instead. Whenever you
+quote an asset's figures, name that asset in the same sentence.
 
 You may write ordinary words for small counts ("both positions", "three legs").
 
@@ -79,6 +85,29 @@ function buildTokens(
   }
 
   return tokens;
+}
+
+/**
+ * Assets whose figures are quoted without the asset ever being named.
+ *
+ * Caught in the wild: the model wrote "led by strong movement in
+ * {{AVAX_CURRENT}}", which substitutes to "movement in 19.9%" — a placeholder
+ * used where a name belonged. Nothing downstream noticed, because every token
+ * resolved and no bare figure was typed; the sentence was simply nonsense.
+ *
+ * The invariant that catches it is also a product rule worth having: if the
+ * prose quotes an asset's numbers, it has to say which asset they belong to.
+ */
+export function unnamedAssets(raw: string, symbols: string[]): string[] {
+  const out: string[] = [];
+  for (const symbol of symbols) {
+    const quoted = new RegExp(String.raw`\{\{${symbol}_[A-Z0-9_]+\}\}`).test(raw);
+    if (!quoted) continue;
+    // The bare ticker, not the one inside a placeholder.
+    const named = new RegExp(String.raw`(^|[^A-Z_{])${symbol}([^A-Z_}]|$)`).test(raw);
+    if (!named) out.push(symbol);
+  }
+  return out;
 }
 
 /**
@@ -159,6 +188,12 @@ export async function writeNarrative(
     const bare = findBareFigures(raw);
     if (bare.length > 0) {
       logDecision("narrative", "fallback", `model typed figures directly: ${bare.join(", ")}`);
+      return fallback;
+    }
+
+    const unnamed = unnamedAssets(raw, ctx.portfolio.rows.map((r) => r.symbol));
+    if (unnamed.length > 0) {
+      logDecision("narrative", "fallback", `figures quoted for unnamed assets: ${unnamed.join(", ")}`);
       return fallback;
     }
 

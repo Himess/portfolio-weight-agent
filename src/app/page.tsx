@@ -9,16 +9,53 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Portfolio } from "./components/Portfolio";
 import { Handoff, ProposalView } from "./components/Proposal";
+import { Watch } from "./components/Watch";
+import { Command } from "./components/Command";
 import { McpPanel } from "./components/McpPanel";
 import { TokenPicker } from "./components/TokenPicker";
-import { Swatch } from "./components/ui";
-import { validateAllocation } from "@/core/allocation";
+import { Swatch, TokenLogo } from "./components/ui";
+import { flattenTargets, validateAllocation } from "@/core/allocation";
+import { bandPpFor } from "@/core/bands";
 import { clear as clearSaved, load as loadSaved, save as saveState } from "@/lib/persist";
-import { daysSinceLastRebalance, markApproved, record as recordDecision, summary as historySummary } from "@/lib/history";
+import { askedLast24h, daysSinceLastRebalance, markApproved, record as recordDecision, summary as historySummary } from "@/lib/history";
 import { pct } from "@/lib/format";
+import { PRESETS, applyPreset, availablePresets, symbolsOf } from "@/lib/presets";
 import type { Allocation, BasketResolution, Preference, Proposal, Target } from "@/types";
 
 type Screen = "allocate" | "portfolio" | "proposal" | "handoff";
+/** The cash leg. One definition, because two would eventually disagree. */
+const CASH = "USDT";
+
+/**
+ * What each rung actually costs, measured with `npm run bands` over 8,760 real
+ * hourly bars, with real fees, order-book slippage and the volatility scaling
+ * the app actually ships. Two numbers because they are the whole trade-off: how
+ * often it interrupts you, and how far the portfolio sits from target between
+ * interruptions. Rates are for a majors portfolio; a volatile one runs 2-3x.
+ */
+const RUNGS: Record<Preference, { blurb: string; rate: string; drift: string }> = {
+  patient: {
+    blurb: "tolerate drift, act rarely",
+    rate: "~19 a year",
+    drift: "2.2pp average drift",
+  },
+  balanced: {
+    blurb: "the default trade-off",
+    rate: "~76 a year, about weekly",
+    drift: "1.2pp average drift",
+  },
+  tight: {
+    blurb: "track closely, accept the cost",
+    rate: "~246 a year, most weekdays",
+    drift: "0.6pp average drift",
+  },
+  continuous: {
+    blurb: "track almost exactly",
+    rate: "~750 a year, a couple a day",
+    drift: "0.3pp average drift",
+  },
+};
+
 const SCREENS: Screen[] = ["allocate", "portfolio", "proposal", "handoff"];
 
 const DEFAULT_TARGETS: Target[] = [
@@ -40,15 +77,23 @@ const DEFAULT_TARGETS: Target[] = [
 
 type Ctx = {
   llmAvailable: boolean;
+  telegram: boolean;
   model: string;
   datasets: string[];
-  replay: { label: string | null; symbols: string[]; interval: string; bars: number } | null;
+  replay: {
+    label: string | null;
+    symbols: string[];
+    interval: string;
+    bars: number;
+    startsAt: number | null;
+    barMs: number;
+  } | null;
 };
 
 export default function Page() {
   const [screen, setScreen] = useState<Screen>("allocate");
   const [targets, setTargets] = useState<Target[]>(DEFAULT_TARGETS);
-  const cashSymbol = "USDT";
+  const cashSymbol = CASH;
   const [preference, setPreference] = useState<Preference>("balanced");
   const [ctx, setCtx] = useState<Ctx | null>(null);
 
@@ -64,6 +109,7 @@ export default function Page() {
     { symbol: "USDT", qty: "6000" },
   ]);
 
+  const [tradable, setTradable] = useState<Set<string>>(new Set());
   const [restoredAt, setRestoredAt] = useState<string | null>(null);
   const [lastEntryAt, setLastEntryAt] = useState<string | null>(null);
   const [history, setHistory] = useState<{ total: number; holds: number; approved: number }>({
@@ -73,6 +119,7 @@ export default function Page() {
   });
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [series, setSeries] = useState<Record<string, number[]>>({});
+  const [pricedQuantities, setPricedQuantities] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,6 +200,9 @@ export default function Page() {
           // replay bar index.
           daysSinceLastRebalance:
             source === "replay" ? Math.round((bar - seedBar) / 24) : daysSinceLastRebalance(),
+          // Replay is a scrub through history, not a day in someone's life, so
+          // the attention budget only applies to live use.
+          askedLast24h: source === "replay" ? 0 : askedLast24h(),
         }),
       });
 
@@ -165,6 +215,9 @@ export default function Page() {
       const p = json.proposal as Proposal;
       setProposal(p);
       setSeries((json.series as Record<string, number[]>) ?? {});
+      // The server is the authority on what was priced: replay seeds its own
+      // quantities and mcp reads them from the account, so the form is not it.
+      setPricedQuantities((json.quantities as Record<string, number>) ?? {});
 
       const entry = recordDecision({
         action: p.timing.action,
@@ -286,6 +339,8 @@ export default function Page() {
           setSeedBar={setSeedBar}
           holdings={holdings}
           setHoldings={setHoldings}
+          tradable={tradable}
+          setTradable={setTradable}
           onReview={review}
           busy={busy}
           restoredAt={restoredAt}
@@ -325,6 +380,17 @@ export default function Page() {
           }}
           onDismiss={() => setScreen("portfolio")}
         />
+      )}
+
+      {screen === "proposal" && proposal && (
+        <div style={{ marginTop: 16 }}>
+          <Watch
+            allocation={allocation}
+            quantities={pricedQuantities}
+            preference={preference}
+            available={Boolean(ctx?.telegram)}
+          />
+        </div>
       )}
 
       {screen === "handoff" && proposal && <Handoff proposal={proposal} onBack={() => setScreen("proposal")} />}
@@ -398,6 +464,8 @@ function Allocate(props: {
   setSeedBar: (n: number) => void;
   holdings: { symbol: string; qty: string }[];
   setHoldings: (h: { symbol: string; qty: string }[]) => void;
+  tradable: Set<string>;
+  setTradable: (s: Set<string>) => void;
   onReview: () => void;
   busy: boolean;
   restoredAt: string | null;
@@ -405,6 +473,15 @@ function Allocate(props: {
   onReset: () => void;
 }) {
   const { targets, setTargets, totalWeight, onTarget, validation, ctx } = props;
+
+  // The band that will actually apply to the position the user cares about
+  // most. Flattened, so a basket is judged by its members' real weights.
+  const largestWeight = useMemo(() => {
+    const flat = Object.entries(flattenTargets({ targets, cashSymbol: CASH })).filter(
+      ([symbol]) => symbol !== CASH,
+    );
+    return flat.length === 0 ? 0.4 : Math.max(...flat.map(([, w]) => w));
+  }, [targets]);
   // Every symbol the allocation already refers to, basket members included.
   const heldSymbols = useMemo(() => {
     const out = new Set<string>();
@@ -417,6 +494,9 @@ function Allocate(props: {
   const [phrase, setPhrase] = useState("");
   const [resolving, setResolving] = useState(false);
   const [pending, setPending] = useState<{ phrase: string; res: BasketResolution } | null>(null);
+  // A weight asked for in the chat ("a basket of AI tokens at 15%"), so the
+  // basket lands where the owner said rather than at zero.
+  const [requestedWeightPct, setRequestedWeightPct] = useState<number | null>(null);
 
   function setWeight(i: number, v: number) {
     const next = [...targets];
@@ -424,16 +504,17 @@ function Allocate(props: {
     setTargets(next);
   }
 
-  async function resolve() {
-    if (!phrase.trim()) return;
+  async function resolve(override?: string) {
+    const text = (override ?? phrase).trim();
+    if (!text) return;
     setResolving(true);
     try {
       const res = await fetch("/api/basket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phrase }),
+        body: JSON.stringify({ phrase: text }),
       });
-      setPending({ phrase, res: (await res.json()) as BasketResolution });
+      setPending({ phrase: text, res: (await res.json()) as BasketResolution });
     } finally {
       setResolving(false);
     }
@@ -442,6 +523,32 @@ function Allocate(props: {
   return (
     <div className="split split-main">
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <Command
+          allocation={{ targets, cashSymbol: CASH }}
+          preference={props.preference}
+          hasProposal={props.history.total > 0}
+          available={Boolean(ctx?.llmAvailable)}
+          onTargets={(next) => {
+            setTargets(next);
+            setPending(null);
+          }}
+          onPreference={props.setPreference}
+          onBasket={(phrase, weightPct) => {
+            setPhrase(phrase);
+            setRequestedWeightPct(weightPct);
+            void resolve(phrase);
+          }}
+          onReview={props.onReview}
+        />
+
+        <Presets
+          tradable={props.tradable}
+          onApply={(preset) => {
+            setTargets(applyPreset(preset));
+            setPending(null);
+          }}
+        />
+
         <div className="card card-p">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16 }}>
             <div>
@@ -506,7 +613,19 @@ function Allocate(props: {
                   borderColor: t.kind === "basket" ? "var(--accent-line)" : "var(--line)",
                 }}
               >
-                <Swatch i={i} />
+                {t.kind === "asset" ? (
+                  <TokenLogo symbol={t.symbol} size={28} />
+                ) : (
+                  // A basket has no single logo; stack its members' so the row
+                  // still reads as "these assets" at a glance.
+                  <span style={{ display: "flex", flex: "none" }}>
+                    {t.members.slice(0, 3).map((m, j) => (
+                      <span key={m.symbol} style={{ marginLeft: j === 0 ? 0 : -10, zIndex: 3 - j }}>
+                        <TokenLogo symbol={m.symbol} size={26} />
+                      </span>
+                    ))}
+                  </span>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>
@@ -566,6 +685,7 @@ function Allocate(props: {
         </div>
 
         <TokenPicker
+          onUniverse={props.setTradable}
           held={heldSymbols}
           onToggle={(sym) => {
             const isLeaf = targets.some((t) => t.kind === "asset" && t.symbol === sym);
@@ -598,7 +718,7 @@ function Allocate(props: {
                 placeholder="AI tokens, DeFi blue chips, restaking…"
               />
             </div>
-            <button className="btn" onClick={resolve} disabled={resolving || !phrase.trim() || !ctx?.llmAvailable}>
+            <button className="btn" onClick={() => void resolve()} disabled={resolving || !phrase.trim() || !ctx?.llmAvailable}>
               {resolving ? "Resolving…" : "Resolve"}
             </button>
           </div>
@@ -664,7 +784,7 @@ function Allocate(props: {
                       {
                         kind: "basket",
                         label: pending.phrase,
-                        weight: 0,
+                        weight: (requestedWeightPct ?? 0) / 100,
                         members: pending.res.members,
                         resolvedAt: new Date().toISOString(),
                         rationale: pending.res.rationale,
@@ -672,9 +792,12 @@ function Allocate(props: {
                     ]);
                     setPending(null);
                     setPhrase("");
+                    setRequestedWeightPct(null);
                   }}
                 >
-                  Add basket — then set its weight
+                  {requestedWeightPct != null
+                    ? `Add basket at ${requestedWeightPct}%`
+                    : "Add basket — then set its weight"}
                 </button>
                 <button className="btn" onClick={() => setPending(null)}>
                   Discard
@@ -690,8 +813,15 @@ function Allocate(props: {
 
         <div className="card card-p">
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>How closely to track</h2>
+          <p style={{ fontSize: 12, color: "var(--ink-2)", margin: "7px 0 0", lineHeight: 1.55 }}>
+            This sets the tolerance band — how far a position may wander before the agent looks at
+            it. The band is a baseline, not a fixed number: it widens on assets that move a lot and
+            narrows on calm ones, because a volatile position drifts on noise that mostly reverses
+            on its own. You choose the line; the agent decides what to do when it is crossed,
+            including waiting.
+          </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
-            {(["patient", "balanced", "tight"] as Preference[]).map((p) => (
+            {(["patient", "balanced", "tight", "continuous"] as Preference[]).map((p) => (
               <button
                 key={p}
                 onClick={() => props.setPreference(p)}
@@ -706,12 +836,35 @@ function Allocate(props: {
                 }}
               >
                 <span style={{ fontWeight: 700, textTransform: "capitalize", minWidth: 62 }}>{p}</span>
-                <span style={{ fontSize: 11.5, opacity: 0.75, fontWeight: 500 }}>
-                  {p === "patient" ? "act rarely, weight cost heavily" : p === "tight" ? "track closely, accept higher cost" : "the default trade-off"}
+                <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                  <span style={{ fontSize: 11.5, opacity: 0.75, fontWeight: 500 }}>
+                    {RUNGS[p].blurb}
+                  </span>
+                  {/*
+                    The consequence of the choice, not an adjective. largestWeight
+                    is the user's own biggest target, so the band on screen is the
+                    one that will actually be applied to it.
+                  */}
+                  <span className="m" style={{ fontSize: 10.5, opacity: 0.6, fontWeight: 500 }}>
+                    ±{bandPpFor(p, largestWeight).toFixed(2)}pp base · {RUNGS[p].rate} ·{" "}
+                    {RUNGS[p].drift}
+                  </span>
                 </span>
               </button>
             ))}
           </div>
+          <p style={{ fontSize: 10.5, color: "var(--ink-3)", margin: "10px 0 0", lineHeight: 1.5 }}>
+            Measured, not estimated: a year of real hourly closes with real fees and order-book
+            slippage. Rates are for a majors portfolio; a volatile one runs roughly twice as often.
+            Even the busiest setting costs under 1% of NAV a year — only the deviation is traded,
+            never the portfolio. Run <span className="m">npm run bands</span> to reproduce.
+            <br />
+            <br />
+            The real limit is you, not cost: every correction needs your approval in Binance, and an
+            unapproved proposal tracks nothing. The agent knows how many times it has already asked
+            today and holds out for the moment worth your signature — so a violent day can end in one
+            message and no proposals.
+          </p>
         </div>
 
         <div className="card card-p">
@@ -742,16 +895,22 @@ function Allocate(props: {
 
           {props.source === "replay" && ctx?.replay && (
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 12 }}>
-              <Slider label={`Bought on target at bar ${props.seedBar}`} max={Math.max(0, ctx.replay.bars - 2)} value={props.seedBar} onChange={props.setSeedBar} />
               <Slider
-                label={`Reviewing at bar ${props.bar} · ${Math.round((props.bar - props.seedBar) / 24)} days later`}
+                label={`Bought the target allocation on ${barDate(ctx.replay, props.seedBar)}`}
+                max={Math.max(0, ctx.replay.bars - 2)}
+                value={props.seedBar}
+                onChange={props.setSeedBar}
+              />
+              <Slider
+                label={`Checking it on ${barDate(ctx.replay, props.bar)} — ${Math.max(0, Math.round(((props.bar - props.seedBar) * ctx.replay.barMs) / 86_400_000))} days later`}
                 max={ctx.replay.bars - 1}
                 value={props.bar}
                 onChange={props.setBar}
               />
               <p style={{ fontSize: 11.5, color: "var(--ink-3)", margin: 0, lineHeight: 1.6 }}>
-                Bought on target, then left alone. Drift comes from the market moving under it.
-                Bar 393 is a captured HOLD.
+                Replays real market history. You buy the allocation on the first date and leave
+                it alone; drift is whatever the market did between then and the second date. The
+                default lands on a day the agent decided to wait.
               </p>
             </div>
           )}
@@ -836,6 +995,96 @@ function Allocate(props: {
             {validation.errors.length > 1 && ` (+${validation.errors.length - 1} more)`}
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** A replay bar as a date, because a bar index means nothing to a reader. */
+function barDate(
+  replay: { startsAt: number | null; barMs: number },
+  bar: number,
+): string {
+  if (replay.startsAt == null) return `bar ${bar}`;
+  return new Date(replay.startsAt + bar * replay.barMs).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/**
+ * Starting allocations. Deciding target weights is the hard part of this
+ * product, and a blank page gives someone nothing to react to. Offered as
+ * starting points to edit, never as recommendations — the app knows nothing
+ * about who is looking at it.
+ */
+function Presets({
+  tradable,
+  onApply,
+}: {
+  tradable: Set<string>;
+  onApply: (p: (typeof PRESETS)[number]) => void;
+}) {
+  const available = availablePresets(tradable);
+  if (available.length === 0) return null;
+
+  return (
+    <div className="card card-p">
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Start from a shape</h2>
+        <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
+          a starting point to edit, not a recommendation
+        </span>
+      </div>
+
+      {/*
+        min() matters: a bare minmax(210px, 1fr) track cannot shrink below 210px,
+        so on a 390px phone the grid forced the card — and with it the page —
+        wider than the screen, and the whole layout scrolled sideways.
+      */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(min(210px,100%),1fr))",
+          gap: 10,
+          marginTop: 14,
+        }}
+      >
+        {available.map((p) => {
+          const symbols = symbolsOf(p);
+          return (
+            <button
+              key={p.key}
+              onClick={() => onApply(p)}
+              className="card"
+              style={{
+                padding: "13px 14px",
+                textAlign: "left",
+                cursor: "pointer",
+                background: "var(--surface-2)",
+                boxShadow: "none",
+              }}
+            >
+              <div style={{ display: "flex", marginBottom: 8 }}>
+                {symbols.slice(0, 5).map((sym, j) => (
+                  <span key={sym} style={{ marginLeft: j === 0 ? 0 : -9, zIndex: 5 - j }}>
+                    <TokenLogo symbol={sym} size={24} />
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{p.name}</div>
+              <div style={{ fontSize: 11.5, color: "var(--ink-2)", marginTop: 4, lineHeight: 1.45 }}>
+                {p.blurb}
+              </div>
+              {p.caution && (
+                <div style={{ fontSize: 10.5, color: "var(--amber)", marginTop: 6, lineHeight: 1.45 }}>
+                  {p.caution}
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

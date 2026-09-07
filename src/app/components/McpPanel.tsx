@@ -94,7 +94,9 @@ export function McpPanel({ onConnectionChange }: { onConnectionChange?: (connect
   return (
     <div className="card card-p">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Binance account</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>
+          Binance account <span style={{ fontWeight: 500, color: "var(--ink-3)" }}>· optional</span>
+        </h2>
         <span className={connected ? "pill pill-green" : "pill pill-quiet"} style={{ padding: "3px 10px", fontSize: 11 }}>
           {connected ? "connected" : "not connected"}
         </span>
@@ -128,27 +130,48 @@ export function McpPanel({ onConnectionChange }: { onConnectionChange?: (connect
                 lineHeight: 1.55,
               }}
             >
-              Binance offers no dynamic client registration, so the browser sign-in needs this app
-              deployed at a public URL. Locally, connect the server once in an MCP client and reuse
-              its token:
-              <code
-                style={{
-                  display: "block",
-                  marginTop: 8,
-                  fontFamily: "var(--mono)",
-                  fontSize: 10.5,
-                  color: "var(--ink)",
-                  wordBreak: "break-all",
-                }}
-              >
-                claude mcp add binance-mcp-server --transport http https://agent.binance.com/mcp/agentic
-              </code>
+              <b style={{ color: "var(--ink)" }}>There is no sign-in button here, and that is deliberate.</b>{" "}
+              Binance only lets an app open its consent screen if Binance has registered that app in
+              advance — there is no self-service route. This one is a hackathon entry, not a
+              registered Binance partner, so it has nothing to sign you in with. Borrowing another
+              product&rsquo;s registration would mean showing you their name on the consent screen,
+              which would be a lie about who you were approving.
+              <br />
+              <br />
+              Nothing is missing from the agent because of it. It reads live Binance prices either
+              way; the only difference is that you type your holdings in yourself instead of it
+              reading your balances.
+              <details style={{ marginTop: 10 }}>
+                <summary style={{ cursor: "pointer", color: "var(--ink-3)" }}>
+                  Already have a Binance MCP session? (developers)
+                </summary>
+                <span style={{ display: "block", marginTop: 8 }}>
+                  Connect the server once in an MCP client and reuse the token it holds:
+                </span>
+                <code
+                  style={{
+                    display: "block",
+                    marginTop: 8,
+                    fontFamily: "var(--mono)",
+                    fontSize: 10.5,
+                    color: "var(--ink)",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  claude mcp add binance-mcp-server --transport http https://agent.binance.com/mcp/agentic
+                </code>
+              </details>
             </div>
           )}
 
           {!showPaste ? (
-            <button className="btn" style={{ width: "100%", marginTop: 8 }} onClick={() => setShowPaste(true)}>
-              Paste an access token
+            <button
+              className="btn"
+              style={{ width: "100%", marginTop: 8 }}
+              onClick={() => setShowPaste(true)}
+              title="For a token from an MCP client that has already completed Binance's consent flow"
+            >
+              I have an access token
             </button>
           ) : (
             <div style={{ marginTop: 10 }}>

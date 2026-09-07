@@ -424,6 +424,12 @@ a {
   display: grid;
   gap: 18px;
   align-items: start;
+  /* A grid column defaults to an `auto` track, whose floor is the widest
+     item's min-content. Below 900px this grid is one column, so a single wide
+     card pushed the column — and the whole page — past the viewport, and the
+     layout scrolled sideways on a phone. minmax(0, 1fr) removes that floor:
+     the column is the container's width, and cards shrink to fit it. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (min-width: 900px) {

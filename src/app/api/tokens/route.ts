@@ -24,9 +24,18 @@ export async function GET(req: Request) {
     const { limit } = TokensQuerySchema.parse(
       Object.fromEntries(new URL(req.url).searchParams),
     );
-    const rows = await publicAdapter().getTickerRows(limit);
+    const adapter = publicAdapter();
+    // Two different things, and conflating them was a bug: `tokens` is the
+    // slice the picker shows, ranked by volume and capped; `universe` is
+    // every symbol that actually trades against the cash asset. Anything
+    // deciding whether a symbol *exists* has to read the second one.
+    const [rows, universe] = await Promise.all([
+      adapter.getTickerRows(limit),
+      adapter.getTradableSymbols(),
+    ]);
     return NextResponse.json({
       tokens: rows.map((r) => ({ ...r, categories: categoriesFor(r.symbol) })),
+      universe,
       asOf: new Date().toISOString(),
     });
   } catch (err) {

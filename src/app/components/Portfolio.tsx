@@ -91,8 +91,9 @@ export function Portfolio({
               const moved = Math.abs(now - s.pct) >= 0.05;
               return (
                 <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 52 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 62 }}>
                     <Swatch i={i} />
+                    <TokenLogo symbol={s.label} size={18} />
                     <span style={{ fontWeight: 600 }}>{s.label}</span>
                   </span>
                   <span className="m" style={{ color: "var(--ink-3)", minWidth: 34 }}>

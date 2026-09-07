@@ -47,9 +47,16 @@ function volume(n: number): string {
 export function TokenPicker({
   held,
   onToggle,
+  onUniverse,
 }: {
   held: Set<string>;
   onToggle: (symbol: string) => void;
+  /**
+   * Reports every symbol that trades against the cash asset — not just the
+   * rows shown below, which are capped by volume. A preset or basket naming a
+   * real but low-volume pair must not be treated as delisted.
+   */
+  onUniverse?: (symbols: Set<string>) => void;
 }) {
   const [tokens, setTokens] = useState<TokenRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,9 +68,19 @@ export function TokenPicker({
   useEffect(() => {
     fetch("/api/tokens?limit=250")
       .then((r) => r.json())
-      .then((j) => (j.error ? setError(j.error) : setTokens(j.tokens as TokenRow[])))
+      .then((j) => {
+        if (j.error) {
+          setError(j.error);
+          return;
+        }
+        const rows = j.tokens as TokenRow[];
+        setTokens(rows);
+        onUniverse?.(
+          new Set((j.universe as string[] | undefined) ?? rows.map((t) => t.symbol)),
+        );
+      })
       .catch(() => setError("Could not reach Binance market data."));
-  }, []);
+  }, [onUniverse]);
 
   const universe = useMemo(
     () => (tokens ?? []).map((t) => ({ symbol: t.symbol, quoteVolume24hUsd: t.quoteVolume24hUsd })),

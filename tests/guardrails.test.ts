@@ -5,7 +5,7 @@ import { buildHoldings, computeDrift } from "../src/core/drift";
 import { computeCostBenefit } from "../src/core/costbenefit";
 import { syntheticBook } from "../src/core/slippage";
 import { deterministicExecution, materializeTrades } from "../src/llm/execution";
-import { findBareFigures, substitute } from "../src/llm/narrative";
+import { findBareFigures, substitute, unnamedAssets } from "../src/llm/narrative";
 import { deterministicTiming } from "../src/llm/timing";
 import type { Allocation, ExchangeInfo, RebalanceContext } from "../src/types";
 
@@ -156,5 +156,35 @@ describe("narrative formatting", () => {
   it("still collapses runs of spaces left by a removed placeholder", () => {
     const { out } = substitute("a  b", {});
     expect(out).toBe("a b");
+  });
+});
+
+describe("a placeholder cannot stand in for an asset's name", () => {
+  const symbols = ["BTC", "ETH", "AVAX", "USDT"];
+
+  it("catches the substitution that reads as a number where a name belongs", () => {
+    // Caught in a real run: "movement in {{AVAX_CURRENT}}" substitutes to
+    // "movement in 19.9%" — every token resolved, no bare figure was typed,
+    // and the sentence was still nonsense.
+    const raw = "Holding steady\n\nDrift is {{TOTAL_DRIFT}}, led by strong movement in {{AVAX_CURRENT}}.";
+    expect(unnamedAssets(raw, symbols)).toEqual(["AVAX"]);
+  });
+
+  it("passes prose that names the asset whose figures it quotes", () => {
+    const raw = "Trim AVAX\n\nAVAX sits {{AVAX_DRIFT}} above its {{AVAX_TARGET}} target.";
+    expect(unnamedAssets(raw, symbols)).toEqual([]);
+  });
+
+  it("does not accept the ticker inside its own placeholder as naming it", () => {
+    expect(unnamedAssets("Head\n\nOne position sits at {{BTC_CURRENT}}.", symbols)).toEqual(["BTC"]);
+  });
+
+  it("ignores assets whose figures are never quoted", () => {
+    expect(unnamedAssets("Head\n\nETH is fine; total drift is {{TOTAL_DRIFT}}.", symbols)).toEqual([]);
+  });
+
+  it("accepts a ticker in possessive or punctuated form", () => {
+    const raw = "Head\n\nETH's weight is {{ETH_CURRENT}}, and BTC, at {{BTC_CURRENT}}, is fine.";
+    expect(unnamedAssets(raw, symbols)).toEqual([]);
   });
 });

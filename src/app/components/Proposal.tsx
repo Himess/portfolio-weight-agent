@@ -62,6 +62,7 @@ const FACTOR: Record<string, string> = {
   falling_knife: "Move still running",
   drift_magnitude: "Drift size",
   staleness: "Time since last rebalance",
+  attention: "Saving your attention",
 };
 
 export function ProposalView({
@@ -137,7 +138,8 @@ export function ProposalView({
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 16 }}>
+      {/* min() so a narrow phone shrinks the tracks instead of widening the page. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(170px,100%),1fr))", gap: 16 }}>
         <Tile label="Estimated cost" value={usd(cb.estimatedCostUsd)} note={bps(cb.costBps)} />
         <Tile label="Drift removed" value={ppAbs(cb.driftReductionPp)} note={`leaves ${ppAbs(cb.totalDriftAfterPp)}`} />
         <Tile label="Cost per point" value={usd(cb.costPerPpUsd)} note="per pp corrected" />
