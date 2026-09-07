@@ -155,10 +155,12 @@ function statusOf(r: ExplainFacts["rows"][number]): string {
  */
 export function deterministicExplain(facts: ExplainFacts): string {
   const factor = facts.primaryFactor.replace(/_/g, " ");
+  // A HOLD is still a decision, so it gets a sentence about the decision rather
+  // than about absence: "nothing was proposed" reads like the agent failed.
   const head =
     facts.verdict === "HOLD"
-      ? `Nothing was proposed, on ${factor}.`
-      : `The verdict was ${facts.verdict}, on ${factor}.`;
+      ? `No trades were proposed; the deciding factor was ${factor}.`
+      : `The verdict was ${facts.verdict}; the deciding factor was ${factor}.`;
 
   const notable = facts.rows.filter((r) => r.outsideBand || r.actedOn || r.declined);
   if (notable.length === 0) {
