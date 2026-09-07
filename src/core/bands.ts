@@ -53,7 +53,6 @@
  * The rungs below are exactly the measured rows; nothing is interpolated.
  */
 
-import { bandFor } from "./drift";
 import { logReturns, stdev } from "./signals";
 import type { BandConfig, Kline, Preference } from "../types";
 
@@ -126,6 +125,64 @@ export const BANDS: Record<Preference, BandConfig> = {
   // proposal tracks nothing.
   continuous: { absoluteFloorPp: 0.2, relativeBandPct: 0.015, absoluteCapPp: 0.4 },
 };
+
+/**
+ * §5.3 — the tolerance band for one position.
+ *
+ *   band_i = min(cap, max(floor, relativeBandPct × targetWeight_i × 100))
+ *
+ * DESIGN.md §5.3 specified only the floor and the relative term. Measured over
+ * a year of real hourly closes, that produced roughly *one alert per year* on a
+ * BTC 50 / ETH 30 / USDT 20 portfolio: 25% of a 50% target is a ±12.5pp band,
+ * so BTC had to reach 62.5% of the portfolio before the product said anything.
+ * A rebalancing tool nobody hears from is not patient, it is broken.
+ *
+ * The cap is the missing half of the rule it was modelled on. The 5/25 rule
+ * takes the *lesser* of 5 percentage points and 25% of the target weight; the
+ * spec took the greater of a floor and the relative term, which is the same
+ * thing only for small positions and far too loose for large ones.
+ *
+ * Cap is optional, so a BandConfig without one behaves exactly as before.
+ * `npm run bands` measures what any choice actually costs in interruptions.
+ */
+export function bandFor(
+  targetWeight: number,
+  bands: BandConfig,
+  volScale = 1,
+  opts: { scaleCap?: boolean } = {},
+): number {
+  const floor = bands.absoluteFloorPp * volScale;
+  const band = Math.max(floor, bands.relativeBandPct * targetWeight * 100 * volScale);
+
+  // Whether volatility widens the cap as well as the terms under it.
+  //
+  // The cap exists to bound the band on a *large* position — 25% of a 50%
+  // target is 12.5pp, which is not a tolerance, it is an absence of one. That
+  // is a statement about position size, and volatility is a different axis. If
+  // the cap scales too, a volatile large position lands back near 12.5pp and
+  // the cap stops doing the job it was added for.
+  //
+  // Measured both ways over the same year (`npm run bands -- --scale-cap`):
+  //
+  //   rung        cap unscaled            cap scaled
+  //   continuous  717/yr 0.27% 0.34pp     750/yr 0.28% 0.33pp
+  //   tight       225/yr 0.14% 0.62pp     246/yr 0.15% 0.61pp
+  //   balanced     61/yr 0.07% 1.15pp      76/yr 0.08% 1.18pp
+  //   patient      18/yr 0.04% 2.38pp      19/yr 0.04% 2.22pp
+  //
+  // Unscaled wins: fewer interruptions and lower cost at every rung, with
+  // tracking within a hundredth of a point. Most of a majors portfolio is
+  // calmer than the reference, so leaving the cap alone widens the ceiling
+  // where volatility is low while the relative term still responds.
+  const cap =
+    bands.absoluteCapPp == null
+      ? null
+      : opts.scaleCap
+        ? bands.absoluteCapPp * volScale
+        : bands.absoluteCapPp;
+
+  return cap == null ? band : Math.min(cap, band);
+}
 
 export function bandsFor(preference: Preference): BandConfig {
   return BANDS[preference] ?? BANDS.balanced;

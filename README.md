@@ -357,10 +357,18 @@ slippage applied to every fill:
 | | base band on 30% | corrections/yr | cost/yr | mean drift |
 |---|---|---|---|---|
 | never | — | 0 | 0.00% | 10.76pp |
-| patient | ±2.50pp | 19 | 0.04% | 2.22pp |
-| balanced | ±1.50pp | 76 | 0.08% | 1.18pp |
-| tight | ±0.75pp | 246 | 0.15% | 0.61pp |
-| continuous | ±0.40pp | 750 | 0.28% | 0.33pp |
+| patient | ±2.50pp | 18 | 0.04% | 2.38pp |
+| balanced | ±1.50pp | 61 | 0.07% | 1.15pp |
+| tight | ±0.75pp | 225 | 0.14% | 0.62pp |
+| continuous | ±0.40pp | 717 | 0.27% | 0.34pp |
+
+The volatility scaling applies to the floor and the relative term but **not the
+cap**. The cap bounds the band on a large position — 25% of a 50% target is
+12.5pp, which is not a tolerance — and that is a statement about position size,
+not about volatility. Scaling it put volatile large positions back near the
+number the cap was added to prevent. Measured both ways: leaving it alone gives
+fewer interruptions and lower cost at every rung, with tracking within a
+hundredth of a point (`npm run bands -- --scale-cap` to compare).
 
 **The band is a baseline, not a constant.** It scales with each asset's own
 realized volatility — `volScale = clamp((vol / 60%)^(2/3), 0.6, 2.5)` — because

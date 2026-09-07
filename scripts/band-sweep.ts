@@ -35,8 +35,8 @@ import path from "node:path";
 import { PaperAccount, ReplayAdapter, type ReplayDataset } from "../src/adapters/replay";
 import { flattenTargets } from "../src/core/allocation";
 import { DEFAULT_PLAN_CONFIG, generateCandidates } from "../src/core/candidates";
-import { BANDS, realizedVolPct, volScales } from "../src/core/bands";
-import { bandFor, buildHoldings, computeDrift } from "../src/core/drift";
+import { BANDS, bandFor, realizedVolPct, volScales } from "../src/core/bands";
+import { buildHoldings, computeDrift } from "../src/core/drift";
 import type { Allocation, BandConfig, Kline, OrderBook } from "../src/types";
 
 function arg(name: string, fallback: string): string {
@@ -101,7 +101,7 @@ async function run(
   dataset: ReplayDataset,
   bands: BandConfig,
   label: string,
-  opts: { from: number; every: number; navUsd: number; scaleByVol: boolean },
+  opts: { from: number; every: number; navUsd: number; scaleByVol: boolean; scaleCap: boolean },
 ): Promise<Result> {
   const adapter = new ReplayAdapter(dataset);
   adapter.seek(opts.from);
@@ -127,6 +127,7 @@ async function run(
   let maxDrift = 0;
   let finalNav = opts.navUsd;
   let volScale: Record<string, number> = {};
+  const scaleCap = opts.scaleCap;
 
   for (let bar = opts.from + 1; bar < adapter.length; bar += opts.every) {
     adapter.seek(bar);
@@ -146,7 +147,7 @@ async function run(
       volScale = volScales(history);
     }
 
-    const state = computeDrift(holdings, ALLOCATION, { bands, volScale });
+    const state = computeDrift(holdings, ALLOCATION, { bands, volScale, scaleCap });
 
     finalNav = state.navUsd;
     driftSum += state.totalDriftPp;
@@ -214,13 +215,15 @@ async function main() {
   // The control: buy once, never touch it. Everything else is measured against
   // this, because "more money" and "less drift" are different questions.
   const scaleByVol = !process.argv.includes("--fixed-bands");
+  const scaleCap = process.argv.includes("--scale-cap");
   const control = await run(dataset, { absoluteFloorPp: 1e9, relativeBandPct: 0 }, "never", {
     from,
     every,
     navUsd,
     scaleByVol,
+    scaleCap,
   });
-  console.log(scaleByVol ? "bands: volatility-scaled (as shipped)" + "\n" : "bands: fixed\n");
+  console.log(scaleByVol ? `bands: volatility-scaled${scaleCap ? ", cap scaled too" : ", cap NOT scaled (as shipped)"}` + "\n" : "bands: fixed\n");
 
   console.log(
     `${"band".padEnd(10)} ${"on 30%".padEnd(8)} ${"rebal/yr".padEnd(10)} ${"trades".padEnd(8)} ` +
@@ -241,7 +244,7 @@ async function main() {
   console.log(line(control));
   const results: Result[] = [];
   for (const rung of LADDER) {
-    const r = await run(dataset, rung.bands, rung.label, { from, every, navUsd, scaleByVol });
+    const r = await run(dataset, rung.bands, rung.label, { from, every, navUsd, scaleByVol, scaleCap });
     results.push(r);
     console.log(line(r));
   }

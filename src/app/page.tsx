@@ -36,22 +36,22 @@ const CASH = "USDT";
 const RUNGS: Record<Preference, { blurb: string; rate: string; drift: string }> = {
   patient: {
     blurb: "tolerate drift, act rarely",
-    rate: "~19 a year",
-    drift: "2.2pp average drift",
+    rate: "~18 a year",
+    drift: "2.4pp average drift",
   },
   balanced: {
     blurb: "the default trade-off",
-    rate: "~76 a year, about weekly",
+    rate: "~61 a year, about weekly",
     drift: "1.2pp average drift",
   },
   tight: {
     blurb: "track closely, accept the cost",
-    rate: "~246 a year, most weekdays",
+    rate: "~225 a year, most weekdays",
     drift: "0.6pp average drift",
   },
   continuous: {
     blurb: "track almost exactly",
-    rate: "~750 a year, a couple a day",
+    rate: "~717 a year, about twice a day",
     drift: "0.3pp average drift",
   },
 };

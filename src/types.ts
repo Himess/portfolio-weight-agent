@@ -61,6 +61,16 @@ export type DriftRow = {
   bandPp: number;
   targetValueUsd: number;
   currentValueUsd: number;
+  /**
+   * What is actually held, in base units.
+   *
+   * Carried rather than reconstructed. A sell cap used to be derived as
+   * `currentValueUsd / midPrice`, which divides a ticker-priced value by an
+   * order-book mid — two different price bases. When the mid sits below the
+   * ticker the quotient exceeds the real balance and the plan proposes selling
+   * more than exists.
+   */
+  qty: number;
 };
 
 export type PortfolioState = {
@@ -295,5 +305,15 @@ export type Proposal = {
    * because that set is regenerated for the chosen subset.
    */
   declined: CandidateTrade[];
+  /**
+   * Set when the buys had to be cut to what the sells actually raise. Surfaced
+   * rather than applied silently: a plan that no longer corrects the drift it
+   * claimed to is a different plan.
+   */
+  funding?: {
+    availableCashUsd: number;
+    requestedUsd: number;
+    adjustments: { symbol: string; fromQty: number; toQty: number | null; reason: string }[];
+  };
   narrative: string;
 };

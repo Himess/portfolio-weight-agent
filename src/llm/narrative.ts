@@ -192,6 +192,15 @@ export function findBareFigures(text: string): string[] {
     /\$\s*\d[\d,]*(\.\d+)?/g, // $1,234.56
     /\d[\d,]*(\.\d+)?\s*%/g, // 12.3%
     /\d[\d,]*(\.\d+)?\s*(pp|bps)\b/gi, // 4.2pp / 30 bps
+
+    // Order sizes, which were missing entirely — the highest-stakes class of
+    // number in the whole product. "sell 1.08 ETH" and "0.16758 BTC" passed
+    // every check while the README claimed no invented figure reaches anyone.
+    /\d[\d,]*\.\d+(?=\s*[A-Z]{2,10}\b)/g, // a decimal followed by a ticker
+    /\b(?:buy|buys|buying|bought|sell|sells|selling|sold|trim|trims|trimming)\s+\d[\d,]*(\.\d+)?/gi,
+    // Any decimal precise enough that it can only be a quantity: prices and
+    // percentages here are written to two places, three or more is a size.
+    /\d+\.\d{3,}/g,
   ];
   const hits: string[] = [];
   for (const re of patterns) {
@@ -232,11 +241,12 @@ export async function writeNarrative(
     reasoning: timing.reasoning,
     assetsToActOn: timing.assetsToActOn,
     plan: trades.map((t) => ({ side: t.side, symbol: t.symbol, method: t.method })),
-    // Values are shown so the model can judge magnitude and pick the right
-    // placeholders — but it must emit the placeholder, not the value.
-    availablePlaceholders: Object.fromEntries(
-      Object.entries(tokens).map(([k, v]) => [`{{${k}}}`, v]),
-    ),
+    // Keys only. The values used to be included "so the model can judge
+    // magnitude", which handed it every real figure and then asked it not to
+    // type one — material and opportunity in the same payload. It does not need
+    // to know $5.67 to write {{EST_COST}}; substitution is what puts the number
+    // on screen either way.
+    availablePlaceholders: Object.keys(tokens).map((k) => `{{${k}}}`),
   };
 
   try {
@@ -341,8 +351,9 @@ export function buildProposal(
   trades: OrderedTrade[],
   narrative: string,
   declined: CandidateTrade[] = [],
+  funding?: Proposal["funding"],
 ): Proposal {
-  return { context: ctx, timing, execution, orderedTrades: trades, declined, narrative };
+  return { context: ctx, timing, execution, orderedTrades: trades, declined, funding, narrative };
 }
 
 // --- formatting helpers: the single place figures become strings ------------

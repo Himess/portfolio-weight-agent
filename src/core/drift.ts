@@ -13,11 +13,7 @@ import type {
   PortfolioState,
 } from "../types";
 import { flattenTargets } from "./allocation";
-
-export const DEFAULT_BANDS: BandConfig = {
-  absoluteFloorPp: 2.0,
-  relativeBandPct: 0.25,
-};
+import { BANDS, bandFor } from "./bands";
 
 /**
  * §5.1 — NAV = Σ (qty_i × price_i) over spot balances.
@@ -88,31 +84,6 @@ export function buildHoldings(
   });
 }
 
-/**
- * §5.3 — the tolerance band for one position.
- *
- *   band_i = min(cap, max(floor, relativeBandPct × targetWeight_i × 100))
- *
- * DESIGN.md §5.3 specified only the floor and the relative term. Measured over
- * a year of real hourly closes, that produced roughly *one alert per year* on a
- * BTC 50 / ETH 30 / USDT 20 portfolio: 25% of a 50% target is a ±12.5pp band,
- * so BTC had to reach 62.5% of the portfolio before the product said anything.
- * A rebalancing tool nobody hears from is not patient, it is broken.
- *
- * The cap is the missing half of the rule it was modelled on. The 5/25 rule
- * takes the *lesser* of 5 percentage points and 25% of the target weight; the
- * spec took the greater of a floor and the relative term, which is the same
- * thing only for small positions and far too loose for large ones.
- *
- * Cap is optional, so a BandConfig without one behaves exactly as before.
- * `npm run bands` measures what any choice actually costs in interruptions.
- */
-export function bandFor(targetWeight: number, bands: BandConfig, volScale = 1): number {
-  const floor = bands.absoluteFloorPp * volScale;
-  const band = Math.max(floor, bands.relativeBandPct * targetWeight * 100 * volScale);
-  const cap = bands.absoluteCapPp == null ? null : bands.absoluteCapPp * volScale;
-  return cap == null ? band : Math.min(cap, band);
-}
 
 /**
  * §5.2 — drift table.
@@ -125,6 +96,7 @@ export function computeDrift(
   holdings: Holding[],
   allocation: Allocation,
   opts: {
+    /** Omitted means the balanced rung of the ladder — never a separate copy of it. */
     bands?: BandConfig;
     asOf?: string;
     /**
@@ -133,9 +105,11 @@ export function computeDrift(
      * so nothing that does not supply it changes.
      */
     volScale?: Record<string, number>;
+    /** Measurement escape hatch for `npm run bands`; the product never sets it. */
+    scaleCap?: boolean;
   } = {},
 ): PortfolioState {
-  const bands = opts.bands ?? DEFAULT_BANDS;
+  const bands = opts.bands ?? BANDS.balanced;
   const navUsd = computeNav(holdings);
   const targets = flattenTargets(allocation);
 
@@ -147,8 +121,10 @@ export function computeDrift(
   ]);
 
   const valueBySymbol = new Map<string, number>();
+  const qtyBySymbol = new Map<string, number>();
   for (const h of holdings) {
     valueBySymbol.set(h.symbol, (valueBySymbol.get(h.symbol) ?? 0) + h.valueUsd);
+    qtyBySymbol.set(h.symbol, (qtyBySymbol.get(h.symbol) ?? 0) + h.qty);
   }
 
   const rows: DriftRow[] = [];
@@ -159,7 +135,9 @@ export function computeDrift(
     const currentWeight = navUsd > 0 ? currentValueUsd / navUsd : 0;
     const driftPp = (currentWeight - targetWeight) * 100;
     const targetValueUsd = navUsd * targetWeight;
-    const bandPp = bandFor(targetWeight, bands, opts.volScale?.[symbol] ?? 1);
+    const bandPp = bandFor(targetWeight, bands, opts.volScale?.[symbol] ?? 1, {
+      scaleCap: opts.scaleCap === true,
+    });
 
     rows.push({
       symbol,
@@ -171,6 +149,7 @@ export function computeDrift(
       bandPp,
       targetValueUsd,
       currentValueUsd,
+      qty: qtyBySymbol.get(symbol) ?? 0,
     });
   }
 

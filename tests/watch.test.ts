@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { breachedSymbols, sentLast24h, shouldNotify, signatureOf } from "../src/lib/watch";
 import { composeMessage, splitNarrative, toPlainText } from "../src/lib/watch-message";
-import { computeDrift, buildHoldings, DEFAULT_BANDS } from "../src/core/drift";
+import { BANDS } from "../src/core/bands";
+import { computeDrift, buildHoldings } from "../src/core/drift";
 import type { Allocation, PortfolioState } from "../src/types";
 
 const ALLOCATION: Allocation = {
@@ -17,7 +18,7 @@ const ALLOCATION: Allocation = {
 function stateWith(prices: Record<string, number>): PortfolioState {
   // 0.5 BTC, 12 ETH, 20,000 USDT — priced so the caller decides who has drifted.
   const holdings = buildHoldings({ BTC: 0.5, ETH: 12, USDT: 20_000 }, prices, "USDT");
-  return computeDrift(holdings, ALLOCATION, { bands: DEFAULT_BANDS });
+  return computeDrift(holdings, ALLOCATION, { bands: BANDS.balanced });
 }
 
 const base = {
@@ -143,7 +144,7 @@ describe("breachedSymbols", () => {
     const nav = 100_000;
     const prices = { BTC: (nav * 0.5) / 0.5, ETH: (nav * 0.3) / 12, USDT: 1 };
     const holdings = buildHoldings({ BTC: 0.5, ETH: 12, USDT: nav * 0.2 }, prices, "USDT");
-    const state = computeDrift(holdings, ALLOCATION, { bands: DEFAULT_BANDS });
+    const state = computeDrift(holdings, ALLOCATION, { bands: BANDS.balanced });
     expect(state.totalDriftPp).toBeCloseTo(0, 6);
     expect(breachedSymbols(state, "USDT")).toEqual([]);
   });

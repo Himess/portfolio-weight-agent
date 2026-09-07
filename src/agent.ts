@@ -16,6 +16,7 @@ import type { MarketAdapter } from "./adapters/types";
 import { allocationSymbols } from "./core/allocation";
 import { bandsFor, volScales } from "./core/bands";
 import { DEFAULT_PLAN_CONFIG, declinedTrades, generateCandidates } from "./core/candidates";
+import { applyFundingLimit } from "./core/funding";
 import { computeCostBenefit } from "./core/costbenefit";
 import {
   MissingPriceError,
@@ -37,6 +38,7 @@ import type {
   PlanConfig,
   Preference,
   Proposal,
+  TimingDecision,
 } from "./types";
 
 export type ReviewInput = {
@@ -207,7 +209,51 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
     : await decideExecution(workingCtx, workingCandidates);
 
   // Quantities come from the deterministic candidates, never from the model.
-  const orderedTrades = materializeTrades(execution, workingCandidates);
+  const selected = materializeTrades(execution, workingCandidates);
+
+  // Can the surviving buys actually be paid for? Nothing checked, and the sum
+  // of deltas only balances while every leg lives — a skipped or dropped SELL,
+  // or a PARTIAL that acts on underweights alone, leaves buys unfunded and
+  // Binance rejects them at the confirmation step.
+  const cashUsd = portfolio.rows.find((r) => r.symbol === cashSymbol)?.currentValueUsd ?? 0;
+  const funded = applyFundingLimit({
+    trades: selected,
+    cashUsd,
+    feeRate: config.feeRate,
+    exchangeInfo,
+    books,
+  });
+  const orderedTrades = funded.trades;
+
+  // A plan with nothing in it is not a rebalance.
+  //
+  // Execution may drop every candidate, and the funding pass may drop the rest;
+  // timing still said REBALANCE, and the deterministic narrative rendered
+  // "The plan is . That removes 0.0pp of drift for an estimated $0." Reported
+  // as the hold it actually is, with the reason the legs went away rather than
+  // a timing reason that was never given.
+  if (orderedTrades.length === 0) {
+    const why = [
+      ...(execution.droppedCandidates ?? []).map((d) => d.why),
+      ...funded.adjustments.filter((a) => a.toQty === null).map((a) => a.reason),
+    ];
+    const held: TimingDecision = {
+      ...timing,
+      action: "HOLD",
+      assetsToActOn: [],
+      reasoning: why.length
+        ? `Every leg was dropped before sending. ${why.join(" ")}`
+        : `${timing.reasoning} Nothing survived to send.`,
+      primaryFactor: "cost",
+    };
+    const ctxNow = { ...workingCtx, costBenefit: computeCostBenefit(portfolio, []) };
+    const narrative = input.deterministicOnly
+      ? `Holding — every leg was dropped.
+
+${held.reasoning}`
+      : await writeNarrative(ctxNow, held, []);
+    return buildProposal(ctxNow, held, execution, [], narrative, candidates);
+  }
 
   // Dropping legs changes the cost/benefit the user is shown, so recompute.
   const finalCtx = {
@@ -226,5 +272,19 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
   // declined, so filtering that would report nothing declined at all.
   const declined = declinedTrades(candidates, orderedTrades);
 
-  return buildProposal(finalCtx, timing, execution, orderedTrades, narrative, declined);
+  return buildProposal(
+    finalCtx,
+    timing,
+    execution,
+    orderedTrades,
+    narrative,
+    declined,
+    funded.scaled
+      ? {
+          availableCashUsd: funded.availableCashUsd,
+          requestedUsd: funded.requestedUsd,
+          adjustments: funded.adjustments,
+        }
+      : undefined,
+  );
 }

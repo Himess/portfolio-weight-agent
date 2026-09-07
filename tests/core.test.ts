@@ -17,9 +17,16 @@ import {
   roundToTick,
   suggestMethod,
 } from "../src/core/candidates";
-import { REFERENCE_VOL_PCT, bandPpFor, realizedVolPct, volScaleFor, volScales } from "../src/core/bands";
+import {
+  REFERENCE_VOL_PCT,
+  bandFor,
+  bandPpFor,
+  realizedVolPct,
+  volScaleFor,
+  volScales,
+} from "../src/core/bands";
 import { computeCostBenefit } from "../src/core/costbenefit";
-import { bandFor, buildHoldings, computeDrift, computeNav, entryShape } from "../src/core/drift";
+import { buildHoldings, computeDrift, computeNav, entryShape } from "../src/core/drift";
 import { computeSignals, isMoveInProgress, logReturns, stdev } from "../src/core/signals";
 import { midPrice, syntheticBook, walkBookByQty } from "../src/core/slippage";
 import type { Allocation, ExchangeInfo, Kline, OrderBook } from "../src/types";
@@ -602,11 +609,25 @@ describe("bands follow the market, not a constant", () => {
     expect(volScaleFor(100_000)).toBeLessThanOrEqual(2.5);
   });
 
-  it("scales the band it is given, floor and cap together", () => {
-    const w = 0.3;
+  it("scales the floor and the relative term", () => {
+    // A weight small enough that the cap is not the binding constraint.
+    const w = 0.1;
     const plain = bandPpFor("balanced", w);
     expect(bandPpFor("balanced", w, 2)).toBeCloseTo(plain * 2, 10);
-    expect(bandPpFor("balanced", w, 0.5)).toBeCloseTo(plain * 0.5, 10);
+    expect(bandPpFor("balanced", w, 0.6)).toBeCloseTo(plain * 0.6, 10);
+  });
+
+  it("does NOT scale the cap — that is the whole reason the cap exists", () => {
+    // The cap bounds the band on a large position: 25% of a 50% target is
+    // 12.5pp, which is not a tolerance. That is a statement about position
+    // size, and volatility is a different axis. Scaling the cap put a volatile
+    // large position back near the number the cap was added to prevent.
+    const w = 0.4;
+    expect(bandPpFor("balanced", w)).toBeCloseTo(1.5, 10); // 0.06*40 = 2.4 -> capped
+    // Volatile: still the cap, not 3.75pp.
+    expect(bandPpFor("balanced", w, 2.5)).toBeCloseTo(1.5, 10);
+    // Calm: the cap is a ceiling, not a fixed value, so the band comes down.
+    expect(bandPpFor("balanced", w, 0.6)).toBeCloseTo(1.44, 10);
   });
 
   it("changes which positions are outside their band", () => {
@@ -626,14 +647,24 @@ describe("bands follow the market, not a constant", () => {
     const holdings = buildHoldings(q, px, "USDT");
 
     const fixed = computeDrift(holdings, alloc, { bands: DEFAULT_PLAN_CONFIG.bands });
-    expect(fixed.rows.find((r) => r.symbol === "BTC")!.outsideBand).toBe(true);
+    expect(fixed.rows.find((r) => r.symbol === "ETH")!.outsideBand).toBe(false);
 
-    // A very volatile BTC gets a wider band and the same deviation stops counting.
-    const scaled = computeDrift(holdings, alloc, {
+    // ETH sits at a 20% target, below the cap, so volatility genuinely moves
+    // its band. Push it just outside, then make it volatile: the same
+    // deviation stops counting.
+    const drifted = buildHoldings(
+      { BTC: (nav * 0.4) / px.BTC, ETH: (nav * 0.215) / px.ETH, SOL: (nav * 0.15) / px.SOL, AVAX: (nav * 0.15) / px.AVAX, USDT: nav * 0.085 },
+      px,
+      "USDT",
+    );
+    const tight = computeDrift(drifted, alloc, { bands: DEFAULT_PLAN_CONFIG.bands });
+    expect(tight.rows.find((r) => r.symbol === "ETH")!.outsideBand).toBe(true);
+
+    const loose = computeDrift(drifted, alloc, {
       bands: DEFAULT_PLAN_CONFIG.bands,
-      volScale: { BTC: 2.5 },
+      volScale: { ETH: 2.5 },
     });
-    expect(scaled.rows.find((r) => r.symbol === "BTC")!.outsideBand).toBe(false);
+    expect(loose.rows.find((r) => r.symbol === "ETH")!.outsideBand).toBe(false);
   });
 
   it("derives a scale per symbol from its own closes", () => {
@@ -787,5 +818,92 @@ describe("execution method from the measured book", () => {
 
   it("treats a negative slippage figure by magnitude", () => {
     expect(suggestMethod({ slippageBps: -20, bookExhausted: false }).method).toBe("spot_limit");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sizing against a book that cannot fill
+// ---------------------------------------------------------------------------
+
+describe("an order is never sized larger than the book can fill", () => {
+  /** A book with a hard depth limit, so the walk genuinely runs out. */
+  function shallow(pair: string, price: number, totalQty: number): OrderBook {
+    return {
+      symbol: pair,
+      bids: [{ price: price * 0.999, qty: totalQty }],
+      asks: [{ price: price * 1.001, qty: totalQty }],
+    };
+  }
+
+  const alloc2: Allocation = {
+    cashSymbol: "USDT",
+    targets: [
+      { kind: "asset", symbol: "SOL", weight: 0.9 },
+      { kind: "asset", symbol: "USDT", weight: 0.1 },
+    ],
+  };
+
+  const info: ExchangeInfo = { symbols: { SOLUSDT: filters("SOLUSDT", "SOL", { stepSize: 0.001, minQty: 0.001 }) } };
+
+  it("caps the quantity to what actually fills, and prices it there", () => {
+    // Wants a large SOL position; the book holds only 10 SOL.
+    const holdings = buildHoldings({ USDT: 100_000 }, { SOL: 200, USDT: 1 }, "USDT");
+    const state = computeDrift(holdings, alloc2);
+    const { candidates } = generateCandidates({
+      state,
+      exchangeInfo: info,
+      books: { SOL: shallow("SOLUSDT", 200, 10) },
+      cashSymbol: "USDT",
+    });
+
+    expect(candidates).toHaveLength(1);
+    const c = candidates[0];
+    // 90% of $100k at $200 would be 450 SOL. The book has 10.
+    expect(c.qty).toBeLessThanOrEqual(10);
+    // And the notional is that quantity at the price it would actually pay —
+    // full size at a partial vwap was the bug.
+    expect(c.estNotionalUsd).toBeCloseTo(c.qty * c.estExecPrice, 2);
+    expect(c.estNotionalUsd).toBeLessThan(3_000);
+  });
+
+  it("says why the rest was left behind", () => {
+    const holdings = buildHoldings({ USDT: 100_000 }, { SOL: 200, USDT: 1 }, "USDT");
+    const state = computeDrift(holdings, alloc2);
+    const { skipped } = generateCandidates({
+      state,
+      exchangeInfo: info,
+      books: { SOL: shallow("SOLUSDT", 200, 10) },
+      cashSymbol: "USDT",
+    });
+    expect(skipped.some((s) => /runs out|cannot fill/.test(s.reason))).toBe(true);
+  });
+});
+
+describe("the sell cap is the balance, not a reconstructed one", () => {
+  it("never proposes selling more than is held when the book mid differs", () => {
+    // currentValueUsd comes from the ticker; mid comes from the book. Dividing
+    // one by the other overstated the balance whenever mid sat below ticker.
+    const info: ExchangeInfo = { symbols: { SOLUSDT: filters("SOLUSDT", "SOL", { stepSize: 0.001, minQty: 0.001 }) } };
+    const alloc3: Allocation = {
+      cashSymbol: "USDT",
+      targets: [
+        { kind: "asset", symbol: "SOL", weight: 0.1 },
+        { kind: "asset", symbol: "USDT", weight: 0.9 },
+      ],
+    };
+    const heldQty = 100;
+    // Ticker says $220; the book mid is $200 — a 10% gap.
+    const holdings = buildHoldings({ SOL: heldQty, USDT: 1_000 }, { SOL: 220, USDT: 1 }, "USDT");
+    const state = computeDrift(holdings, alloc3);
+    const { candidates } = generateCandidates({
+      state,
+      exchangeInfo: info,
+      books: { SOL: syntheticBook("SOLUSDT", 200) },
+      cashSymbol: "USDT",
+    });
+
+    const sell = candidates.find((c) => c.side === "SELL");
+    expect(sell).toBeDefined();
+    expect(sell!.qty).toBeLessThanOrEqual(heldQty);
   });
 });

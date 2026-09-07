@@ -207,7 +207,8 @@ export function generateCandidates(input: CandidateInputs): CandidateResult {
 
     // A SELL cannot exceed what we actually hold.
     if (side === "SELL") {
-      const held = row.currentValueUsd / mid;
+      // The balance itself, not a value divided by a different price base.
+      const held = row.qty;
       if (qty > held) qty = roundDownToStep(held, filters.stepSize);
       if (qty <= 0) {
         skipped.push({ symbol: row.symbol, reason: `Nothing to sell in ${row.symbol}.` });
@@ -215,7 +216,36 @@ export function generateCandidates(input: CandidateInputs): CandidateResult {
       }
     }
 
-    const walk = walkBookByQty(book, side, qty);
+    let walk = walkBookByQty(book, side, qty);
+
+    // A trade the book cannot fill must never be sized as if it could.
+    //
+    // walkBookByQty computes vwap from the part that *did* fill, and this used
+    // to multiply it by the full quantity — full size at a partial price. The
+    // slippage figure counted only the filled portion too, so the unfillable
+    // remainder was free. Both errors point the same way: on an illiquid asset
+    // the cost came out optimistic, which corrupts costPerPpUsd, the number the
+    // timing call leans on hardest. The one case where cost should stop a trade
+    // was the case where cost was wrong.
+    if (walk.exhausted && walk.filledQty > 0) {
+      const fillable = roundDownToStep(walk.filledQty, filters.stepSize);
+      if (fillable < filters.minQty || fillable <= 0) {
+        skipped.push({
+          symbol: row.symbol,
+          reason: `The ${pair} book cannot fill even the minimum size right now.`,
+        });
+        continue;
+      }
+      skipped.push({
+        symbol: row.symbol,
+        reason:
+          `The ${pair} book runs out before ${qty} ${row.symbol}; sized down to ${fillable} ` +
+          `and the rest left for later.`,
+      });
+      qty = fillable;
+      walk = walkBookByQty(book, side, qty);
+    }
+
     const estNotionalUsd = qty * walk.vwap;
 
     // MIN_NOTIONAL is checked after rounding, per DESIGN.md §5.4 step 2.

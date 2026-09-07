@@ -241,3 +241,35 @@ describe("the prose cannot describe trades the plan does not contain", () => {
     expect(claimedSidesNotInPlan(text, plan, ["SOL", "BNSOL"])).toEqual([]);
   });
 });
+
+describe("the figure guard covers order sizes", () => {
+  it("catches a quantity next to a ticker", () => {
+    // The class it missed entirely. Nothing rejected this, and the README
+    // claimed no invented figure reaches the user.
+    expect(findBareFigures("We are selling 1.08 ETH today.").length).toBeGreaterThan(0);
+    expect(findBareFigures("Buying 0.16758 BTC now.").length).toBeGreaterThan(0);
+  });
+
+  it("catches a quantity after a side verb", () => {
+    expect(findBareFigures("sell 12 of them").length).toBeGreaterThan(0);
+    expect(findBareFigures("buy 3.5 more").length).toBeGreaterThan(0);
+  });
+
+  it("catches any decimal precise enough to be a size", () => {
+    // Prices and percentages here are written to two places. Three or more is
+    // a quantity, whatever it sits next to.
+    expect(findBareFigures("the figure was 0.16758")).toContain("0.16758");
+  });
+
+  it("still ignores placeholders, which is the whole point", () => {
+    const raw =
+      "Trimming {{AVAX_QTY}} AVAX for {{AVAX_NOTIONAL}}, cutting drift by {{DRIFT_REDUCTION}}.";
+    expect(findBareFigures(raw)).toEqual([]);
+  });
+
+  it("does not fire on ordinary prose or small counts", () => {
+    expect(findBareFigures("Both positions have crossed their bands.")).toEqual([]);
+    expect(findBareFigures("Three legs, sells before buys.")).toEqual([]);
+    expect(findBareFigures("AVAX is still running hot, so we are waiting.")).toEqual([]);
+  });
+});
