@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Portfolio } from "./components/Portfolio";
 import { Handoff, ProposalView } from "./components/Proposal";
 import { Watch } from "./components/Watch";
+import { Ask } from "./components/Ask";
 import { Command } from "./components/Command";
 import { McpPanel } from "./components/McpPanel";
 import { TokenPicker } from "./components/TokenPicker";
@@ -358,6 +359,7 @@ export default function Page() {
           busy={busy}
           restoredAt={restoredAt}
           history={history}
+          proposal={proposal}
           onReset={() => {
             clearSaved();
             setTargets(DEFAULT_TARGETS);
@@ -393,6 +395,13 @@ export default function Page() {
           }}
           onDismiss={() => setScreen("portfolio")}
         />
+      )}
+
+      {/* The question belongs next to the plan it is about, not two screens back. */}
+      {screen === "proposal" && proposal && (
+        <div style={{ marginTop: 16 }}>
+          <Ask proposal={proposal} available={Boolean(ctx?.llmAvailable)} />
+        </div>
       )}
 
       {screen === "proposal" && proposal && (
@@ -485,6 +494,7 @@ function Allocate(props: {
   busy: boolean;
   restoredAt: string | null;
   history: { total: number; holds: number; approved: number };
+  proposal: Proposal | null;
   onReset: () => void;
 }) {
   const { targets, setTargets, totalWeight, onTarget, validation, ctx } = props;
@@ -561,6 +571,7 @@ function Allocate(props: {
           allocation={{ targets, cashSymbol: CASH }}
           preference={props.preference}
           hasProposal={props.history.total > 0}
+          proposal={props.proposal}
           available={Boolean(ctx?.llmAvailable)}
           onTargets={(next) => {
             setTargets(next);

@@ -42,8 +42,11 @@ Pick exactly one intent:
                      "add" and the basket's weight, symbol "BASKET".
 - "review"         — run the analysis now. "check my portfolio", "what should I
                      do", "any drift?"
-- "explain"        — a question about the current state or the last decision.
-                     Put the question in "phrase".
+- "explain"        — a QUESTION about the current state or the last decision.
+                     "why didn't you sell AVAX?", "why that verdict?", "how am
+                     I doing?" Put the question in "phrase". A question about a
+                     trade is not a request to place one: "why didn't you sell
+                     AVAX" is "explain", while "sell AVAX" is "unsupported".
 - "unsupported"    — anything else, and in particular ANY request to buy, sell,
                      place, cancel or approve an order, to move funds, or to
                      change something outside the target allocation. Say plainly
@@ -60,7 +63,8 @@ Rules that matter:
   symbol they said and let the checker reject it, or use "unsupported" and say
   it is not listed.
 - "sell BTC" is not an edit. Reducing a target weight is an edit; selling is an
-  order, and orders are "unsupported".
+  order, and orders are "unsupported". Asking *about* one is neither — a
+  sentence in the past tense, or one that starts with why, is "explain".
 - Percentages are of the whole portfolio unless the owner clearly says otherwise.
   "make BTC half" is 50. "double BTC" is not a weight you can compute — return
   "unsupported" and ask for a number.

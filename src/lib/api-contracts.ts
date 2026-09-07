@@ -122,6 +122,66 @@ export const SparksQuerySchema = z.object({
     ),
 });
 
+/**
+ * The digest of a decision, sent back up so the agent can be asked about it.
+ *
+ * The web surface holds the proposal client-side — there is no server session
+ * for a portfolio — so a question about the last verdict has to carry the
+ * verdict with it. This is deliberately a *digest* rather than the Proposal
+ * type: the explain path prints figures, and everything it can print is listed
+ * here, bounded and parsed, instead of a large nested object being trusted
+ * because it happens to have arrived.
+ *
+ * It also decides what the answer is allowed to know. A question about a
+ * position it does not contain gets "that was not part of this decision",
+ * which is the honest answer.
+ */
+export const ExplainFactsSchema = z.object({
+  verdict: z.enum(["REBALANCE", "PARTIAL", "HOLD"]),
+  primaryFactor: z.string().trim().max(40),
+  reasoning: z.string().trim().max(1200),
+  navUsd: z.number().finite().nonnegative(),
+  totalDriftPp: z.number().finite(),
+  daysSinceLastRebalance: z.number().int().nonnegative().nullable().default(null),
+  costBenefit: z.object({
+    estimatedCostUsd: z.number().finite().nonnegative(),
+    driftReductionPp: z.number().finite(),
+    costPerPpUsd: z.number().finite(),
+  }),
+  rows: z
+    .array(
+      z.object({
+        symbol: Symbol_,
+        targetWeight: Weight,
+        currentWeight: Weight,
+        driftPp: z.number().finite(),
+        bandPp: z.number().finite().nonnegative(),
+        deltaUsd: z.number().finite(),
+        outsideBand: z.boolean(),
+        actedOn: z.boolean(),
+        declined: z.boolean(),
+        priceChange4hPct: z.number().finite().nullable().default(null),
+        priceChange24hPct: z.number().finite().nullable().default(null),
+        volRatio: z.number().finite().nullable().default(null),
+      }),
+    )
+    .min(1)
+    .max(40),
+  trades: z
+    .array(
+      z.object({
+        side: z.enum(["BUY", "SELL"]),
+        symbol: Symbol_,
+        qty: z.number().finite().positive(),
+        estNotionalUsd: z.number().finite().nonnegative(),
+      }),
+    )
+    .max(40)
+    .default([]),
+});
+
+export type ExplainFacts = z.infer<typeof ExplainFactsSchema>;
+
 export const CommandRequestSchema = z.object({
   // Long enough for a real instruction, short enough that the box is not a
   // channel for pasting a prompt at the model.
@@ -129,9 +189,27 @@ export const CommandRequestSchema = z.object({
   allocation: AllocationSchema,
   preference: PreferenceSchema.default("balanced"),
   hasProposal: z.boolean().default(false),
+  // Present only when there is a decision to ask about. Absent is not an
+  // error: every other intent works without one.
+  facts: ExplainFactsSchema.nullish().default(null),
 });
 
 export type CommandRequest = z.infer<typeof CommandRequestSchema>;
+
+/**
+ * A question about a decision, asked from the screen showing it.
+ *
+ * No allocation, no preference, no universe: an answer about a verdict that has
+ * already been reached needs none of them, and a question box on the proposal
+ * screen that could reach the allocation would be a way to edit a portfolio by
+ * accident while reading a plan.
+ */
+export const ExplainRequestSchema = z.object({
+  question: z.string().trim().min(1, "Ask something.").max(400),
+  facts: ExplainFactsSchema,
+});
+
+export type ExplainRequest = z.infer<typeof ExplainRequestSchema>;
 
 export const WatchRequestSchema = z.object({
   allocation: AllocationSchema,

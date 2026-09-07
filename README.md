@@ -341,6 +341,31 @@ that shape.
 
 **HOLD** gets its own layout — see below.
 
+**Ask about this decision.** A box under the plan that answers *"why didn't you
+trade SOL?"* — offered next to the plan rather than two screens back, because
+that is where the question actually occurs to someone. It suggests the question
+worth asking, which is normally the leg the agent declined: the one a threshold
+rule would have traded.
+
+Three properties make it something other than a chat window bolted on:
+
+- **It answers from the fact sheet the verdict was made on**, not from a fresh
+  look at the market. Ask an hour later and you get the reason the decision had,
+  which is the difference between an explanation and a second guess.
+- **It cannot type a figure.** Same rule as the narrative layer and the same
+  enforcement: the model writes `{{AVAX_DRIFT}}`, the server substitutes. The
+  substitution table *is* the bound — there is no token for a position the
+  decision did not contain, so a claim about it cannot acquire a number.
+- **It cannot say a trade happened.** The first live run answered *"You sold SOL
+  because it crossed its tolerance band"* — every figure correct, and the one
+  claim this product must never make, since the plan was on screen awaiting
+  approval in Binance. So past-tense execution is now a rejected answer, not just
+  a discouraged one (`claimsExecution` in `src/llm/explain.ts`), and the check
+  is pinned to that exact sentence in the tests.
+
+It routes nothing and reaches nothing: `/api/explain` takes a question and a
+decision digest, and there is no allocation in the request to change.
+
 **Standing alerts.** The app can only tell you something when you open it, and
 drift happens while you are not looking. A watch messages you in Telegram when
 the allocation crosses a band — carrying the agent's verdict, including the
@@ -658,7 +683,7 @@ npm run build
 
 ---
 
-## Screenshots
+## Reaching each screen
 
 Reproduce with `npm run dev` after capturing a dataset:
 
@@ -666,10 +691,14 @@ Reproduce with `npm run dev` after capturing a dataset:
 |---|---|
 | Portfolio view | Replay source, seed bar 30, review bar 8759 → **Review my portfolio** |
 | Proposal (REBALANCE) | …then **See what the agent decided** |
-| Proposal (HOLD) | Requires `ANTHROPIC_API_KEY`. Run `npm run replay -- --data data/window-365d.json --scan`, pick a bar from a *"move still in progress"* run, and set it as the review bar. |
+| Proposal (HOLD) | Needs a judgment provider (any key from the table above). Run `npm run replay -- --data data/window-365d.json --scan`, pick a bar from a *"move still in progress"* run, and set it as the review bar. |
+| Ask about a decision | On any proposal — the suggested question names the leg it declined |
 
-> Screenshot files are not committed yet — capture them into `docs/screenshots/` before submitting.
-> The `HOLD` shot is the one that proves the product is not a bot; give it room in the demo.
+> No images are committed. Every screen above is reachable from a clone in under
+> a minute, which is a stronger claim than a picture — and a picture of a HOLD is
+> the one thing a reader would be right to be sceptical of, since it is trivial
+> to fake and the whole product rests on it. The replay harness reproduces it
+> instead: same dataset, same bar, same decision.
 
 ---
 

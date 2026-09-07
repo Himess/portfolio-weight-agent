@@ -425,7 +425,9 @@ any attempt to bypass the confirmation gate.
 - `docs/mcp-tools.json` — the observed tool list, offered as a contribution since it isn't published.
 - Explicit statement: **this is not investment advice, the user is the decision-maker, and every order
   requires user confirmation.** Binance's own framing puts responsibility on the user; match it.
-- Screenshots, including the HOLD state.
+- A way to reach every screen, the HOLD included. Reproduction beats a screenshot here: a picture
+  of a HOLD is trivial to fake and the whole product rests on it, so the replay harness renders
+  the real one from the same dataset and bar instead.
 
 ---
 

@@ -64,6 +64,17 @@ export const NarrativeSchema = z.object({
 export type NarrativeOutput = z.infer<typeof NarrativeSchema>;
 
 /**
+ * Answering a question about a decision already made.
+ *
+ * One field, because the answer is one paragraph and a headline would invite
+ * the model to restate the verdict it was asked to explain.
+ */
+export const ExplainSchema = z.object({
+  answer: z.string(),
+});
+export type ExplainOutput = z.infer<typeof ExplainSchema>;
+
+/**
  * Routing a typed instruction.
  *
  * Every field is present and nullable rather than optional: JSON-schema

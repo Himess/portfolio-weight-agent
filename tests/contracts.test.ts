@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AllocationSchema,
+  ExplainRequestSchema,
   McpTokenRequestSchema,
   ReviewRequestSchema,
   SparksQuerySchema,
@@ -151,5 +152,67 @@ describe("mcp token", () => {
   it("accepts a plausible one and trims it", () => {
     const parsed = McpTokenRequestSchema.parse({ token: "  " + "a".repeat(40) + "  " });
     expect(parsed.token).toHaveLength(40);
+  });
+});
+
+describe("a question about a decision", () => {
+  const facts = {
+    verdict: "PARTIAL" as const,
+    primaryFactor: "falling_knife",
+    reasoning: "AVAX is still falling.",
+    navUsd: 100_000,
+    totalDriftPp: 4.86,
+    daysSinceLastRebalance: 11,
+    costBenefit: { estimatedCostUsd: 5.67, driftReductionPp: 2.15, costPerPpUsd: 2.64 },
+    rows: [
+      {
+        symbol: "AVAX",
+        targetWeight: 0.15,
+        currentWeight: 0.2,
+        driftPp: 4.86,
+        bandPp: 1.23,
+        deltaUsd: -5202,
+        outsideBand: true,
+        actedOn: false,
+        declined: true,
+        priceChange4hPct: -15.18,
+        priceChange24hPct: -21.4,
+        volRatio: 2.23,
+      },
+    ],
+    trades: [],
+  };
+
+  it("accepts a question about a decision that exists", () => {
+    expect(ExplainRequestSchema.parse({ question: "why not AVAX?", facts }).facts.rows).toHaveLength(1);
+  });
+
+  it("will not take a question with no decision attached", () => {
+    // Without facts there is nothing to answer from, and an answer invented to
+    // fill the gap is the one thing this surface must not produce.
+    expect(() => ExplainRequestSchema.parse({ question: "why not AVAX?" })).toThrow();
+  });
+
+  it("rejects an empty question rather than answering a blank", () => {
+    expect(() => ExplainRequestSchema.parse({ question: "   ", facts })).toThrow();
+  });
+
+  it("caps the question, so the box is not a channel for a prompt", () => {
+    expect(() => ExplainRequestSchema.parse({ question: "a".repeat(401), facts })).toThrow();
+  });
+
+  it("carries no allocation, so a question cannot reach the portfolio", () => {
+    const parsed = ExplainRequestSchema.parse({
+      question: "why not AVAX?",
+      facts,
+      allocation: { targets: [leaf("BTC", 1)], cashSymbol: "USDT" },
+    });
+    expect(parsed).not.toHaveProperty("allocation");
+  });
+
+  it("rejects a verdict it does not recognise", () => {
+    expect(() =>
+      ExplainRequestSchema.parse({ question: "why?", facts: { ...facts, verdict: "SELL_EVERYTHING" } }),
+    ).toThrow();
   });
 });

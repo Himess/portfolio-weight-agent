@@ -21,7 +21,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { Allocation, Preference, Target } from "@/types";
+import { explainFactsFrom } from "@/lib/explain-facts";
+import type { Allocation, Preference, Proposal, Target } from "@/types";
 
 type Turn = {
   role: "you" | "agent";
@@ -34,17 +35,32 @@ type Turn = {
   pending?: boolean;
 };
 
-const EXAMPLES = [
+const EDIT_EXAMPLES = [
   "make BTC 40 and add SUI at 10",
   "track more closely",
   "add a basket of AI tokens at 15%",
-  "how am I doing?",
 ];
+
+/**
+ * The fourth suggestion is the question the agent can now answer, aimed at
+ * whichever position makes it interesting: one it declined, else one it traded.
+ * A static "why didn’t you sell AVAX?" is a bad prompt on a portfolio with no
+ * AVAX in it, and worse on one where AVAX was sold.
+ */
+function examplesFor(proposal: Proposal | null): string[] {
+  if (!proposal) return EDIT_EXAMPLES;
+  const left = proposal.declined[0]?.symbol;
+  if (left) return [...EDIT_EXAMPLES, `why didn’t you trade ${left}?`];
+  const sold = proposal.orderedTrades.find((t) => t.side === "SELL")?.symbol;
+  if (sold) return [...EDIT_EXAMPLES, `why sell ${sold}?`];
+  return [...EDIT_EXAMPLES, "why that verdict?"];
+}
 
 export function Command({
   allocation,
   preference,
   hasProposal,
+  proposal,
   onTargets,
   onPreference,
   onBasket,
@@ -54,6 +70,8 @@ export function Command({
   allocation: Allocation;
   preference: Preference;
   hasProposal: boolean;
+  /** The last decision, so a question about it can be answered from its facts. */
+  proposal: Proposal | null;
   onTargets: (t: Target[]) => void;
   onPreference: (p: Preference) => void;
   onBasket: (phrase: string, weightPct: number | null) => void;
@@ -80,7 +98,15 @@ export function Command({
       const res = await fetch("/api/command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, allocation, preference, hasProposal }),
+        body: JSON.stringify({
+          message,
+          allocation,
+          preference,
+          hasProposal,
+          // Only the fields an answer may quote. The router decides whether
+          // the question was one about the decision at all.
+          facts: proposal ? explainFactsFrom(proposal) : null,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "That did not work.");
@@ -186,7 +212,7 @@ export function Command({
 
           {turns.length === 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-              {EXAMPLES.map((e) => (
+              {examplesFor(proposal).map((e) => (
                 <button
                   key={e}
                   onClick={() => void send(e)}

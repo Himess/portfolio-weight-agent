@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { validateAllocation } from "@/core/allocation";
 import { applyEdits, describeApplied, type Edit } from "@/core/commands";
 import { routeCommand } from "@/llm/command";
+import { explainDecision } from "@/llm/explain";
 import { findBareFigures } from "@/llm/narrative";
 import { CommandRequestSchema } from "@/lib/api-contracts";
 import { BASKET_LIMIT, rateLimit } from "@/server/guard";
@@ -15,7 +16,6 @@ const NEUTRAL: Record<string, string> = {
   set_preference: "Tracking preference updated.",
   add_basket: "Resolving that category now.",
   review: "Running the review.",
-  explain: "The figures are on the screen next to this.",
   unsupported: "I cannot do that from here.",
 };
 
@@ -122,6 +122,30 @@ export async function POST(req: Request) {
       // show the members, pin only on approval.
       const weightPct = routed.edits.find((e) => e.weightPct != null)?.weightPct ?? null;
       return NextResponse.json({ ...base, phrase: routed.phrase, weightPct });
+    }
+
+    // "Why didn't you sell AVAX?" — answered from the fact sheet the verdict was
+    // made from, with figures substituted rather than typed. The router's own
+    // acknowledgement is discarded here: it was written before the facts were
+    // read, and two sentences about the same decision would disagree eventually.
+    if (routed.intent === "explain") {
+      // `base` carries the acknowledgement's own guard result; reporting a
+      // figure stripped from a sentence nobody sees would be noise.
+      const shell = {
+        intent: routed.intent,
+        ...(routed.fellBack ? { fellBack: true, fallbackReason: routed.fallbackReason } : {}),
+      };
+      if (!body.facts) {
+        return NextResponse.json({
+          ...shell,
+          say: "There is no decision to explain yet — run a review and ask again.",
+        });
+      }
+      return NextResponse.json({
+        ...shell,
+        say: await explainDecision(body.message, body.facts),
+        answered: true,
+      });
     }
 
     return NextResponse.json({ ...base, phrase: routed.phrase });
