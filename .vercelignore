@@ -2,6 +2,7 @@
 # committed demo slice needs to ship — it is what the deployed replay uses.
 data/*.json
 !data/demo-window.json
+!data/demo-volatile.json
 
 # Local-only artefacts
 data/replay-journal.json

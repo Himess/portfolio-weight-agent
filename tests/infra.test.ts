@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TtlCache } from "../src/lib/cache";
 import { HttpError, TimeoutError, fetchJson, fetchJsonFrom, isRetryable } from "../src/lib/http";
+import { failure } from "../src/server/respond";
 
 describe("TtlCache", () => {
   afterEach(() => vi.useRealTimers());
@@ -140,5 +141,46 @@ describe("fetchJson", () => {
       fetchJsonFrom(["https://a.test", "https://b.test"], "/p", { backoffMs: 1 }),
     ).rejects.toBeInstanceOf(HttpError);
     expect(n).toBe(1);
+  });
+});
+
+describe("errors name the upstream that actually failed", () => {
+  async function body(res: Response) {
+    return (await res.json()) as { error: string; code: string; retryable: boolean };
+  }
+
+  it("blames Telegram for a Telegram failure", async () => {
+    const res = failure(
+      new HttpError(401, "https://api.telegram.org/bot123/getMe", "Unauthorized"),
+      "Creating the watch",
+    );
+    const json = await body(res);
+    expect(json.error).toContain("Telegram returned HTTP 401");
+    expect(json.error).not.toContain("Binance");
+  });
+
+  it("still blames Binance for a Binance failure", async () => {
+    const res = failure(new HttpError(418, "https://api.binance.com/api/v3/ticker", ""), "The review");
+    expect((await body(res)).error).toContain("Binance returned HTTP 418");
+  });
+
+  it("names the model provider rather than an exchange", async () => {
+    const res = failure(
+      new HttpError(429, "https://generativelanguage.googleapis.com/v1beta/openai/chat", ""),
+      "The review",
+    );
+    const json = await body(res);
+    expect(json.error).toContain("model provider is rate-limiting");
+    expect(json.code).toBe("rate_limited");
+  });
+
+  it("names the upstream on a timeout too", async () => {
+    const res = failure(new TimeoutError("https://api.telegram.org/bot123/sendMessage", 12000), "Alerting");
+    expect((await body(res)).error).toContain("waiting for Telegram");
+  });
+
+  it("survives an unparseable url without claiming a vendor", async () => {
+    const res = failure(new HttpError(500, "not-a-url", ""), "Something");
+    expect((await body(res)).error).toContain("the upstream service");
   });
 });

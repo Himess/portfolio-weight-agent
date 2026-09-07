@@ -122,6 +122,38 @@ Defaults: `absoluteFloorPp = 2.0`, `relativeBandPct = 0.25`. So a 40% target has
 target has a ±2pp floor band. This is deterministic. The LLM may *widen* bands via the timing
 decision (§7.1); it may never narrow them.
 
+> **Amended after measurement.** As specified, this is not the 5/25 rule it
+> resembles: 5/25 takes the *lesser* of 5pp and 25% of the target weight, while
+> `max(floor, relative)` takes the greater. A 50% position therefore got a
+> ±12.5pp band, and `npm run bands` measured **one alert per year** on a majors
+> portfolio over 8,760 real hourly bars. The implementation adds an optional
+> `absoluteCapPp` and the tracking preferences now set floor/relative/cap
+> together (`src/core/bands.ts`). The preference also previously reached only the
+> timing prompt, so all three settings shared one band; it now sets the band
+> itself.
+>
+> A second measurement then moved the numbers again. `npm run bands` sweeps band
+> widths over the same year with real fees, real order-book slippage and the
+> exchange filters applied, and shows that frequent correction is cheap in this
+> product because only the *deviation* is traded: 822 corrections a year cost
+> 0.26% of NAV and cut mean drift from 9.85pp to 0.30pp. The defaults were
+> therefore paying for a caution the data does not support. The four rungs are
+> now the measured rows — patient ±2.5pp (17/yr), balanced ±1.5pp (67/yr), tight
+> ±0.75pp (267/yr), continuous ±0.4pp (822/yr) on a 40% position — and a fourth
+> `continuous` preference was added for the "several times a day" case. The
+> binding constraint is the human approval gate in §3, not cost.
+>
+> Third amendment: the band is no longer a constant. It scales with each asset's
+> own realized volatility, `clamp((vol / 60%)^(2/3), 0.6, 2.5)` from 14 days of
+> hourly closes, because a fixed percentage-point band tells you which of your
+> assets is jumpiest rather than what has drifted. Measured volatility over the
+> year was BTC 43%, ETH 60%, SUI 86%, TAO 100%, WLD 121%; on a volatile
+> portfolio the scaling cuts interruptions ~30% for ~0.15pp of tracking. Still
+> deterministic — §2 holds, the model picks no thresholds. And the timing
+> decision now receives `askedLast24h`, so it can spend the owner's attention
+> deliberately rather than proposing on every breach.
+
+
 ### 5.4 Candidate trade generation
 
 ```

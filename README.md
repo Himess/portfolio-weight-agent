@@ -165,19 +165,25 @@ Placeholders emitted: `{{TOTAL_DRIFT}}`, `{{EST_COST}}`. Bare figures typed by t
 `docs/hold-example.json` holds a real HOLD from the judgment layer — not the deterministic fallback,
 which the capture script rejects. Reproduce with `npm run hold:example`.
 
-Replay bar 393 (2025-09-23). AVAX is **+4.9pp against a 3.8pp band**, so a threshold bot trades here.
-The agent did not, and the deterministic facts say why: `volRatio` 1.93, 4h `+3.2%`, 24h `+9.9%` —
-AVAX is overweight *and still climbing*, so correcting now means selling into a move that has not
-finished. One candidate trade, already sized and priced, was declined.
+Replay bar 393 (2025-09-23). AVAX is **+4.86pp against a 1.23pp band**, so a threshold bot trades
+here. The agent did not, and the deterministic facts say why: `volRatio` 1.93, 4h `+3.2%`,
+24h `+9.9%` — AVAX is overweight *and still climbing*, so correcting now means selling into a move
+that has not finished. Candidate trades, already sized and priced, were declined.
 
-> Holding steady despite drift
+> Holding steady on AVAX
 >
-> Your portfolio shows a total drift of 4.9pp led by AVAX currently at 19.9%, but active upward
-> momentum means we are holding off on trades today. Selling into this rapid climb would be
-> premature, so we wait for the price action to settle before acting.
+> AVAX is still running hot with high volatility, so we are holding off on rebalancing today despite
+> the 4.9pp drift. Letting momentum cool protects us from chasing the price while it surges. We will
+> wait for the market to settle before trimming the position.
 
 `primaryFactor: falling_knife`. That is the whole product in one screen: a bot cannot say
 "do nothing today", and this can, with its reasons on the table.
+
+One caveat stated rather than buried: re-running that bar gave HOLD once and PARTIAL on later runs.
+The decision calls run at temperature 0 and Gemini's free tier still does not repeat itself, so a
+marginal verdict is not reproducible. Every run picked `falling_knife` and every run declined to
+sell AVAX — what varied was whether to also buy the two underweights while waiting. Every *number*
+above is repeatable, because the model is not allowed to produce one.
 
 `.env` is gitignored. Next.js loads it automatically; the `tsx` scripts load it via
 `--env-file-if-exists`, which is why `npm run replay` and `npm run llm:check` see it too.
@@ -215,7 +221,25 @@ that lost two thirds of its value. That is the trade people cannot make themselv
 
 Four screens; three of them carry the product.
 
-**Allocate.** A live token picker over the full Binance USDT universe — 250 pairs
+**Allocate.** Type what you want instead of clicking it: *"remove SUI, add TAO at
+12% and track more closely"* is one sentence and three controls. The model's only
+job is turning that into edits from a fixed list — `src/core/commands.ts` then
+applies them by arithmetic, checks every ticker against the live exchange, and
+renders what actually changed as chips (`Removed SUI (was 10%)`, `Added TAO at
+12%`). The chips come from the result, never from the model's prose, so if the
+two ever disagree the chips are right. It works in whatever language you type in.
+
+There is no instruction that trades. "Sell all my BTC" returns *unsupported* with
+a sentence saying approval happens in Binance — reducing a target weight is an
+edit, selling is an order, and orders are not something a sentence can do here.
+
+Starting shapes for anyone who has not done this before — majors,
+core-and-satellites, mostly-cash, and one built from Binance's tokenized US
+equities (SPYB, QQQB, and a mega-cap tech basket). Offered as something to edit,
+never as a recommendation, and each is checked against the live tradable universe
+before it is shown, so a preset naming a delisted pair simply does not appear.
+
+Below them, a live token picker over the full Binance USDT universe — 250 pairs
 ordered by real 24h volume, with real price and change, official logos, and
 sparklines drawn from real hourly closes. Search runs against the exchange, not a
 curated list: typing `sol` returns SOL, SOLV and BNSOL.
@@ -253,6 +277,67 @@ that shape.
 
 **HOLD** gets its own layout — see below.
 
+**Standing alerts.** The app can only tell you something when you open it, and
+drift happens while you are not looking. A watch messages you in Telegram when
+the allocation crosses a band — carrying the agent's verdict, including the
+verdict to wait, which is the one a threshold bot can never send.
+
+It fires on the same band the app draws on screen; there is no second, quieter
+notification threshold to disagree with it. The owner sets that band, and the
+app prints what the choice costs rather than three adjectives.
+
+Those four settings are the measured rows of `npm run bands` — a year of real
+hourly closes, checked every hour, with the 10bps taker fee and order-book
+slippage applied to every fill:
+
+| | base band on 30% | corrections/yr | cost/yr | mean drift |
+|---|---|---|---|---|
+| never | — | 0 | 0.00% | 10.76pp |
+| patient | ±2.50pp | 19 | 0.04% | 2.22pp |
+| balanced | ±1.50pp | 76 | 0.08% | 1.18pp |
+| tight | ±0.75pp | 246 | 0.15% | 0.61pp |
+| continuous | ±0.40pp | 750 | 0.28% | 0.33pp |
+
+**The band is a baseline, not a constant.** It scales with each asset's own
+realized volatility — `volScale = clamp((vol / 60%)^(2/3), 0.6, 2.5)` — because
+a volatile position drifts on noise that mostly reverses, and paying fees to
+undo noise is just paying. Measured over the year, annualized volatility was
+BTC 43%, ETH 60%, SUI 86%, TAO 100%, WLD 121%; on a fixed band the loud names
+would breach constantly and the quiet ones never, so you would be told which
+asset is jumpiest rather than what has drifted. On a volatile portfolio the
+scaling cuts interruptions about 30% for roughly a sixth of a point of tracking.
+
+It is deterministic on purpose. The model still never picks a threshold.
+
+The first version of this ladder was set from equity-market convention — 5%
+bands, annual rebalancing — and measured out at 1-6 corrections a year with the
+portfolio sitting 4.16pp from target. That is a rebalancing tool that barely
+rebalances. Frequent correction turns out to be *cheap* here, because only the
+deviation is traded: even the busiest rung is under 1% of NAV a year, and it
+cuts average drift by 30x.
+
+The binding constraint is not money but attention — every correction needs a
+human approval in Binance, and an unapproved proposal tracks nothing. So the
+timing decision is told how many times the owner has already been asked today,
+and holds out for the moment worth a signature. A violent day can end in one
+message and no proposals.
+
+The two messages below are 37 hours apart *in the same breach*. The drift barely
+moved; the answer did:
+
+```
+Holding steady on AVAX                          Rebalancing your portfolio now
+                                     …vs…
+HOLD · falling_knife                            REBALANCE · drift_magnitude
+```
+
+Both are verbatim output from `npm run watch:preview`, which renders a real
+alert from real data and sends nothing. The bot can only send messages — it
+cannot place, cancel or approve an order.
+
+Full behaviour, thresholds, measured frequency and setup:
+**[`docs/telegram-alerts.md`](docs/telegram-alerts.md)**.
+
 ---
 
 ## How the numbers are computed
@@ -262,7 +347,8 @@ that shape.
 | NAV | `Σ (qty × price)` over spot balances; cash at 1.0 |
 | Drift | `(currentWeight − targetWeight) × 100`, in percentage points |
 | **Total drift** | `Σ\|driftPp\| / 2` — halved because over- and under-weights always mirror each other, so the result is the share of the portfolio that must change hands |
-| Band | `max(2.0pp, 25% × targetWeight × 100)` — a 40% target gets ±10pp, a 5% target gets the ±2pp floor |
+| Band | `min(cap, max(floor, relative × targetWeight × 100)) × volScale`, set by the tracking preference — balanced is 0.7pp / 6% / 1.5pp. Rungs are the measured rows of `npm run bands` |
+| `volScale` | `clamp((realizedVol / 60%)^(2/3), 0.6, 2.5)`, from 14 days of hourly closes — a volatile asset gets a wider band because its drift mostly reverses |
 | Slippage | walk real order-book levels to the required depth; VWAP vs mid |
 | Cost/benefit | `estimatedCostUsd / max(driftReductionPp, 0.01)` — the price of one point of correction |
 | `volRatio` | 4h vs 24h stdev of hourly log returns |

@@ -17,3 +17,4 @@ data/replay-journal.json
 
 # The demo slice is committed so a deployment has a replay source
 !data/demo-window.json
+!data/demo-volatile.json

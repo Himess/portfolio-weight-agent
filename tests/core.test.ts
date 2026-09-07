@@ -14,6 +14,7 @@ import {
   roundDownToStep,
   roundToTick,
 } from "../src/core/candidates";
+import { REFERENCE_VOL_PCT, bandPpFor, realizedVolPct, volScaleFor, volScales } from "../src/core/bands";
 import { computeCostBenefit } from "../src/core/costbenefit";
 import { bandFor, buildHoldings, computeDrift, computeNav } from "../src/core/drift";
 import { computeSignals, isMoveInProgress, logReturns, stdev } from "../src/core/signals";
@@ -97,7 +98,8 @@ describe("allocation", () => {
     };
     const res = validateAllocation(bad);
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.errors.join(" ")).toMatch(/sum to 1\.0/);
+    // The message is for a person: the gap and its direction, not four decimals.
+    if (!res.ok) expect(res.errors.join(" ")).toMatch(/20\.0pp still to place/);
   });
 
   it("rejects a basket whose members do not sum to 1.0", () => {
@@ -213,9 +215,41 @@ describe("nav and drift", () => {
     expect(signed).toBeCloseTo(0, 8);
   });
 
-  it("applies relative bands above the floor and the floor below it", () => {
-    expect(bandFor(0.4, DEFAULT_PLAN_CONFIG.bands)).toBeCloseTo(10, 10); // 0.25 * 40
-    expect(bandFor(0.05, DEFAULT_PLAN_CONFIG.bands)).toBeCloseTo(2, 10); // floor wins
+  it("bands a position by floor, relative share and cap in that order", () => {
+    const b = DEFAULT_PLAN_CONFIG.bands; // balanced: 0.7pp floor, 6% relative, 1.5pp cap
+    expect(bandFor(0.05, b)).toBeCloseTo(0.7, 10); // 0.06 * 5  = 0.30 -> floor wins
+    expect(bandFor(0.2, b)).toBeCloseTo(1.2, 10); //  0.06 * 20 = 1.20 -> relative wins
+    expect(bandFor(0.4, b)).toBeCloseTo(1.5, 10); //  0.06 * 40 = 2.40 -> cap wins
+    expect(bandFor(0.9, b)).toBeCloseTo(1.5, 10); //  still the cap
+  });
+
+  it("leaves a config without a cap behaving exactly as it used to", () => {
+    // The cap is optional so an older PlanConfig keeps its meaning.
+    const uncapped = { absoluteFloorPp: 2.0, relativeBandPct: 0.25 };
+    expect(bandFor(0.4, uncapped)).toBeCloseTo(10, 10);
+  });
+
+  it("widens or narrows every band with the tracking preference", () => {
+    // The preference used to reach only the timing prompt, so all three
+    // produced the identical band and the setting did nothing to what the user
+    // was shown.
+    const w = 0.4;
+    expect(bandPpFor("patient", w)).toBeGreaterThan(bandPpFor("balanced", w));
+    expect(bandPpFor("balanced", w)).toBeGreaterThan(bandPpFor("tight", w));
+    expect(bandPpFor("tight", w)).toBeGreaterThan(bandPpFor("continuous", w));
+    // The rungs are the measured rows of npm run bands:sweep, not interpolations.
+    expect(bandPpFor("patient", w)).toBeCloseTo(2.5, 10);
+    expect(bandPpFor("balanced", w)).toBeCloseTo(1.5, 10);
+    expect(bandPpFor("tight", w)).toBeCloseTo(0.75, 10);
+    expect(bandPpFor("continuous", w)).toBeCloseTo(0.4, 10);
+  });
+
+  it("orders the ladder consistently at every target weight", () => {
+    for (const w of [0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8]) {
+      expect(bandPpFor("patient", w)).toBeGreaterThanOrEqual(bandPpFor("balanced", w));
+      expect(bandPpFor("balanced", w)).toBeGreaterThanOrEqual(bandPpFor("tight", w));
+      expect(bandPpFor("tight", w)).toBeGreaterThanOrEqual(bandPpFor("continuous", w));
+    }
   });
 
   it("treats unallocated holdings as drift against a zero target", () => {
@@ -512,5 +546,97 @@ describe("cost/benefit", () => {
     for (const t of candidates) {
       expect(Math.sign(d[t.symbol])).toBe(t.side === "BUY" ? 1 : -1);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Volatility-scaled bands
+// ---------------------------------------------------------------------------
+
+describe("bands follow the market, not a constant", () => {
+  /** Hourly closes with a chosen per-bar volatility, deterministic. */
+  function series(sigma: number, n = 400): number[] {
+    let price = 100;
+    const out = [price];
+    // Alternating +/- gives an exact, seed-free standard deviation.
+    for (let i = 1; i < n; i++) {
+      price *= Math.exp(i % 2 === 0 ? sigma : -sigma);
+      out.push(price);
+    }
+    return out;
+  }
+
+  it("says nothing when there is not enough history to say anything", () => {
+    expect(realizedVolPct([100, 101, 102])).toBeNull();
+    // ...and a null estimate must leave the band exactly as it was.
+    expect(volScaleFor(null)).toBe(1);
+  });
+
+  it("annualizes hourly returns", () => {
+    // sigma per hour -> sigma * sqrt(8760) annualized, as a percentage. The
+    // tolerance is for Bessel's correction in the sample stdev, not for slop:
+    // the assertion is about the sqrt(8760) factor.
+    const sigma = 0.01;
+    const v = realizedVolPct(series(sigma))!;
+    const expected = sigma * Math.sqrt(8760) * 100;
+    expect(Math.abs(v - expected) / expected).toBeLessThan(0.005);
+  });
+
+  it("leaves a reference-volatility asset alone", () => {
+    expect(volScaleFor(REFERENCE_VOL_PCT)).toBeCloseTo(1, 10);
+  });
+
+  it("widens the band for a volatile asset and narrows it for a calm one", () => {
+    // Measured on real 2025-26 data: BTC ~43%, WLD ~121% annualized.
+    expect(volScaleFor(43)).toBeLessThan(1);
+    expect(volScaleFor(121)).toBeGreaterThan(1);
+    // Sub-linear on purpose: 2x the volatility must not mean 2x the band.
+    expect(volScaleFor(120) / volScaleFor(60)).toBeLessThan(2);
+  });
+
+  it("clamps, so one strange fortnight cannot produce a strange band", () => {
+    expect(volScaleFor(1)).toBeGreaterThanOrEqual(0.6);
+    expect(volScaleFor(100_000)).toBeLessThanOrEqual(2.5);
+  });
+
+  it("scales the band it is given, floor and cap together", () => {
+    const w = 0.3;
+    const plain = bandPpFor("balanced", w);
+    expect(bandPpFor("balanced", w, 2)).toBeCloseTo(plain * 2, 10);
+    expect(bandPpFor("balanced", w, 0.5)).toBeCloseTo(plain * 0.5, 10);
+  });
+
+  it("changes which positions are outside their band", () => {
+    // 0.9 BTC at 100k is 47.4% of a 190k portfolio against a 40% target:
+    // +7.4pp of drift. Balanced bands a 40% position at 1.5pp, so it breaches
+    // either way -- use a small deviation where the scaling actually decides.
+    const nav = 100_000;
+    const px = { BTC: 100_000, ETH: 4_000, SOL: 200, AVAX: 40 };
+    // Put BTC 2pp over its 40% target.
+    const q = {
+      BTC: (nav * 0.42) / px.BTC,
+      ETH: (nav * 0.2) / px.ETH,
+      SOL: (nav * 0.15) / px.SOL,
+      AVAX: (nav * 0.15) / px.AVAX,
+      USDT: nav * 0.08,
+    };
+    const holdings = buildHoldings(q, px, "USDT");
+
+    const fixed = computeDrift(holdings, alloc, { bands: DEFAULT_PLAN_CONFIG.bands });
+    expect(fixed.rows.find((r) => r.symbol === "BTC")!.outsideBand).toBe(true);
+
+    // A very volatile BTC gets a wider band and the same deviation stops counting.
+    const scaled = computeDrift(holdings, alloc, {
+      bands: DEFAULT_PLAN_CONFIG.bands,
+      volScale: { BTC: 2.5 },
+    });
+    expect(scaled.rows.find((r) => r.symbol === "BTC")!.outsideBand).toBe(false);
+  });
+
+  it("derives a scale per symbol from its own closes", () => {
+    const scales = volScales({ CALM: [], LOUD: [] });
+    // Empty history is not an excuse to invent a multiplier.
+    expect(scales.CALM).toBe(1);
+    expect(scales.LOUD).toBe(1);
   });
 });

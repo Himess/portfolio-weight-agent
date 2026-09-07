@@ -1,9 +1,11 @@
 /**
- * Confirms which LLM provider the app will actually use, and that the key is
- * being loaded from .env. Keys are printed masked, never in full.
+ * Confirms what the app will actually be able to do with this environment:
+ * which LLM provider it resolves, and whether standing alerts are wired.
+ * Secrets are printed masked, never in full.
  */
 
 import { resolveProvider } from "../src/llm/provider";
+import { describeStore } from "../src/server/watch-store";
 
 const KEYS = [
   "ANTHROPIC_API_KEY",
@@ -43,10 +45,38 @@ if (p.kind === "none") {
       "  ANTHROPIC_API_KEY=...    paid               — https://console.anthropic.com/settings/keys\n" +
       "\nThen: npm run llm:check",
   );
-  process.exit(0);
+} else {
+  console.log(`  kind    ${p.kind}`);
+  console.log(`  model   ${p.model}`);
+  if (p.baseUrl) console.log(`  baseUrl ${p.baseUrl}`);
+  console.log("\nNext: npm run llm:check -- --n 10");
 }
 
-console.log(`  kind    ${p.kind}`);
-console.log(`  model   ${p.model}`);
-if (p.baseUrl) console.log(`  baseUrl ${p.baseUrl}`);
-console.log("\nNext: npm run llm:check -- --n 10");
+// ---------------------------------------------------------------------------
+// Standing alerts
+// ---------------------------------------------------------------------------
+
+console.log("\nTelegram alerts:");
+const bot = process.env.TELEGRAM_BOT_TOKEN;
+const cron = process.env.CRON_SECRET;
+
+if (!bot) {
+  console.log("  off — TELEGRAM_BOT_TOKEN is not set");
+  console.log("  Create a bot with @BotFather, then follow docs/telegram-alerts.md");
+} else {
+  console.log(`  TELEGRAM_BOT_TOKEN   ${mask(bot)}`);
+  console.log(
+    cron
+      ? `  CRON_SECRET          ${mask(cron)}`
+      : "  CRON_SECRET          MISSING — the scan and the setup route both refuse without it",
+  );
+  console.log(
+    process.env.AUTH_SECRET
+      ? "  AUTH_SECRET          set — the webhook secret derives from it"
+      : "  AUTH_SECRET          missing — fine locally, required in production",
+  );
+
+  const store = describeStore();
+  console.log(`  watch store          ${store.kind}${store.durable ? "" : "   <-- NOT durable"}`);
+  console.log(`                       ${store.note}`);
+}

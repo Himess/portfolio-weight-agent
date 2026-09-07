@@ -84,6 +84,7 @@ export async function POST(req: Request) {
       quantities,
       preference: body.preference,
       daysSinceLastRebalance: body.daysSinceLastRebalance,
+      askedLast24h: body.askedLast24h,
     });
 
     // Real hourly closes for the sparklines. Never synthesised: a made-up

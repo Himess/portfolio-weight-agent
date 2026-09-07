@@ -1,9 +1,9 @@
 {
-  "capturedAt": "2026-09-06T18:48:17.806Z",
+  "capturedAt": "2026-09-07T00:26:34.190Z",
   "provider": "Gemini (free tier) · gemini-flash-lite-latest",
   "note": "A real HOLD from the judgment layer. A threshold rule would have traded here: the position is outside its band. The agent declined and said why.",
   "replay": {
-    "dataset": "window-365d.json",
+    "dataset": "demo-window.json",
     "bar": 393,
     "seedBar": 30,
     "asOf": "2025-09-23T03:59:59.999Z"
@@ -63,7 +63,7 @@
           "driftPp": 4.856628422739351,
           "deltaUsd": -5202.389020788445,
           "outsideBand": true,
-          "bandPp": 3.75,
+          "bandPp": 1.2340428981822402,
           "targetValueUsd": 16067.90318700376,
           "currentValueUsd": 21270.292207792205
         },
@@ -73,8 +73,8 @@
           "currentWeight": 0.37847561298234295,
           "driftPp": -2.152438701765708,
           "deltaUsd": 2305.678445062098,
-          "outsideBand": false,
-          "bandPp": 10,
+          "outsideBand": true,
+          "bandPp": 0.8999999999999999,
           "targetValueUsd": 42847.74183201003,
           "currentValueUsd": 40542.063386947935
         },
@@ -84,8 +84,8 @@
           "currentWeight": 0.18189319713297902,
           "driftPp": -1.8106802867020988,
           "deltaUsd": 1939.5890366230378,
-          "outsideBand": false,
-          "bandPp": 5,
+          "outsideBand": true,
+          "bandPp": 0.9184728068728768,
           "targetValueUsd": 21423.870916005017,
           "currentValueUsd": 19484.28187938198
         },
@@ -96,7 +96,7 @@
           "driftPp": -0.6646188831082311,
           "deltaUsd": 711.9354580025083,
           "outsideBand": false,
-          "bandPp": 2.5,
+          "bandPp": 0.7,
           "targetValueUsd": 10711.935458002508,
           "currentValueUsd": 10000
         },
@@ -107,7 +107,7 @@
           "driftPp": -0.22889055116332158,
           "deltaUsd": 245.18608110081186,
           "outsideBand": false,
-          "bandPp": 3.75,
+          "bandPp": 0.8654365680235448,
           "targetValueUsd": 16067.90318700376,
           "currentValueUsd": 15822.717105902948
         }
@@ -123,6 +123,22 @@
         "volRatio": 1.9262773531055697,
         "priceChange4hPct": 3.1896042528056654,
         "priceChange24hPct": 9.874213836477978
+      },
+      {
+        "symbol": "BTC",
+        "realizedVol24h": 0.32321434288351175,
+        "realizedVol4h": 0.36264447208165207,
+        "volRatio": 1.1219937483168907,
+        "priceChange4hPct": -0.27607391643872814,
+        "priceChange24hPct": -2.0147424476377553
+      },
+      {
+        "symbol": "ETH",
+        "realizedVol24h": 0.62290232194158,
+        "realizedVol4h": 0.7704783869565082,
+        "volRatio": 1.236916864517273,
+        "priceChange4hPct": -0.26362917591471724,
+        "priceChange24hPct": -2.7371936449544383
       }
     ],
     "candidates": [
@@ -140,15 +156,45 @@
         "bookExhausted": false,
         "id": "t1",
         "sequenceIndex": 0
+      },
+      {
+        "side": "BUY",
+        "symbol": "BTC",
+        "pair": "BTCUSDT",
+        "qty": 0.02052,
+        "estNotionalUsd": 2305.6776381189597,
+        "estFeeUsd": 2.3056776381189596,
+        "estSlippageUsd": 0.46104331895955375,
+        "estExecPrice": 112362.46,
+        "midPrice": 112339.99,
+        "slippageBps": 1.999999999998064,
+        "bookExhausted": false,
+        "id": "t2",
+        "sequenceIndex": 1
+      },
+      {
+        "side": "BUY",
+        "symbol": "ETH",
+        "pair": "ETHUSDT",
+        "qty": 0.4631,
+        "estNotionalUsd": 1939.8553244862,
+        "estFeeUsd": 1.9398553244862,
+        "estSlippageUsd": 0.38789348619981756,
+        "estExecPrice": 4188.85,
+        "midPrice": 4188.01,
+        "slippageBps": 1.9999999999990592,
+        "bookExhausted": false,
+        "id": "t3",
+        "sequenceIndex": 2
       }
     ],
     "costBenefit": {
-      "estimatedCostUsd": 6.241619476679966,
+      "estimatedCostUsd": 11.336089244444498,
       "totalDriftBeforePp": 4.856628422739354,
-      "totalDriftAfterPp": 2.4288803388044458,
-      "driftReductionPp": 2.4277480839349086,
-      "costPerPpUsd": 2.5709502225467773,
-      "costBps": 0.5826789660142204
+      "totalDriftAfterPp": 0.44744551616109907,
+      "driftReductionPp": 4.4091829065782555,
+      "costPerPpUsd": 2.571018142053414,
+      "costBps": 1.0582671347198707
     },
     "daysSinceLastRebalance": 15,
     "preference": "balanced"
@@ -157,9 +203,9 @@
     "timing": {
       "action": "HOLD",
       "assetsToActOn": [],
-      "reasoning": "AVAX is currently outside its band with a significant drift, but its price is still moving upward rapidly with a high volRatio. Selling into this active upward move would be premature. It is better to hold off until the price action stabilizes.",
+      "reasoning": "AVAX is currently ripping upward and its move is still running with high volatility. It is wiser to wait for the momentum to cool before attempting to rebalance.",
       "primaryFactor": "falling_knife"
     },
-    "narrative": "Holding steady despite drift Your portfolio shows a total drift of 4.9pp led by AVAX currently at 19.9%, but active upward momentum means we are holding off on trades today. Selling into this rapid climb would be premature, so we wait for the price action to settle before acting."
+    "narrative": "Holding steady on AVAX\n\nAVAX is still running hot with high volatility, so we are holding off on rebalancing today despite the 4.9pp drift. Letting momentum cool protects us from chasing the price while it surges. We will wait for the market to settle before trimming the position."
   }
 }
