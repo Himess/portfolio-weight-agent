@@ -30,9 +30,13 @@ export function validateAllocation(alloc: Allocation): ValidationResult {
       errors.push(`Target ${describe(t)} has an invalid weight: ${t.weight}`);
       continue;
     }
-    if (t.weight === 0) {
-      // Reached both by a hand-built allocation and by adding from the picker,
-      // which starts a new asset at zero — so the message must fit both.
+    // A zero-weight *risk* leg is unfinished business: reached by a hand-built
+    // allocation and by adding from the picker, which starts an asset at zero.
+    // A zero-weight *cash* leg is a decision — "fully invested, no buffer" — and
+    // rejecting it made "add SUI at 10%" fail on a portfolio that already summed
+    // to 100 with a 10% cash leg, which is exactly what the owner asked for.
+    const isCash = t.kind === "asset" && t.symbol === alloc.cashSymbol;
+    if (t.weight === 0 && !isCash) {
       errors.push(`${describe(t)} has no weight yet — give it one, or remove it.`);
     }
     total += t.weight;
@@ -49,8 +53,12 @@ export function validateAllocation(alloc: Allocation): ValidationResult {
   }
 
   if (Math.abs(total - 1) > WEIGHT_EPSILON) {
+    const pct = total * 100;
+    const over = pct > 100;
+    // Four decimal places is a debugging format. What the owner needs is the
+    // gap and its direction.
     errors.push(
-      `Target weights must sum to 1.0 (100%); they sum to ${(total * 100).toFixed(4)}%.`,
+      `Weights total ${pct.toFixed(1)}% — ${Math.abs(pct - 100).toFixed(1)}pp ${over ? "too much" : "still to place"}.`,
     );
   }
 

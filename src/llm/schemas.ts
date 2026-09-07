@@ -24,6 +24,7 @@ export const TimingSchema = z.object({
     "falling_knife",
     "drift_magnitude",
     "staleness",
+    "attention",
   ]),
 });
 export type TimingOutput = z.infer<typeof TimingSchema>;
@@ -61,3 +62,26 @@ export const NarrativeSchema = z.object({
   body: z.string(),
 });
 export type NarrativeOutput = z.infer<typeof NarrativeSchema>;
+
+/**
+ * Routing a typed instruction.
+ *
+ * Every field is present and nullable rather than optional: JSON-schema
+ * constrained decoding is markedly more reliable when the shape never varies,
+ * and a missing key and a null key are the same thing to the executor.
+ */
+export const CommandSchema = z.object({
+  intent: z.enum(["edit", "set_preference", "add_basket", "review", "explain", "unsupported"]),
+  edits: z.array(
+    z.object({
+      op: z.enum(["set", "add", "remove"]),
+      symbol: z.string(),
+      weightPct: z.number().nullable(),
+    }),
+  ),
+  preference: z.enum(["patient", "balanced", "tight", "continuous"]).nullable(),
+  /** A category phrase for add_basket, or the question for explain. */
+  phrase: z.string().nullable(),
+  say: z.string(),
+});
+export type CommandOutput = z.infer<typeof CommandSchema>;
