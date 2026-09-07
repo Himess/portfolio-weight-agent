@@ -21,7 +21,8 @@
     "demo:dataset": "node --env-file-if-exists=.env --import tsx scripts/make-demo-dataset.ts",
     "watch:preview": "node --env-file-if-exists=.env --import tsx scripts/watch-preview.ts",
     "watch:scan": "node --env-file-if-exists=.env --import tsx scripts/watch-scan.ts",
-    "bands": "node --env-file-if-exists=.env --import tsx scripts/band-sweep.ts"
+    "bands": "node --env-file-if-exists=.env --import tsx scripts/band-sweep.ts",
+    "bundle": "node --import tsx scripts/bundle.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
