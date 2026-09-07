@@ -91,13 +91,52 @@ export function computeSignals(symbol: string, hourly: Kline[]): AssetSignals {
  *
  * This is computed, not judged: it is offered to the LLM as a fact. The LLM
  * decides what to do about it.
+ *
+ * The two thresholds were guessed, then measured — `npm run knife` — because
+ * this flag gates the only judgment arm the product actually uses to decline a
+ * trade, and every other threshold here had been swept against real closes
+ * while these had not. The measurement asks one question: when the flag fires,
+ * does the move continue? Benefit is ((P[t+24h] - P[t]) / P[t]) * sign(4h move)
+ * in bps, so positive means waiting got a better price for the trade the drift
+ * implies. Two windows, chosen to disagree — majors (BTC/ETH/SOL/AVAX, 34,576
+ * hourly bars) and a deliberately jumpier basket (BTC/ETH/SUI/TAO/WLD, 43,294):
+ *
+ *   move >=3%    majors: mean / median / won      volatile: mean / median / won
+ *   volRatio 1.0    +2.5 / +10.8 / 51%              +11.9 / -29.3 / 47%
+ *   volRatio 1.3   +19.6 / +29.5 / 53%              +17.2 / -17.7 / 48%
+ *   volRatio 1.5   +45.6 / +47.0 / 56%              +22.0 /  -5.8 / 49%
+ *   volRatio 2.0   +70.0 / +87.2 / 61%              -23.5 /  +7.1 / 50%
+ *
+ * Three things to read off it, in order of how much they should be trusted:
+ *
+ *   1. Moving from 1.3 to 1.5 improves mean, median and win rate in BOTH
+ *      windows. That is the only change both datasets agree on, so it is the
+ *      only one made. 1.3 was firing on bars where waiting did not pay.
+ *   2. 2.0 looks best on majors and turns NEGATIVE on the volatile basket. It
+ *      is not adopted. Taking the majors column alone would have been fitting
+ *      the constant to one dataset.
+ *   3. The baseline — same move, calm by comparison — is heavily negative
+ *      everywhere (-55bps majors, -34bps volatile at 3%/1.5). So the flag is
+ *      separating something real, but read what it separates honestly: bars it
+ *      rejects mean-revert, rather than bars it fires on being reliably good.
+ *
+ * And the part that does not flatter the flag: on the volatile basket the
+ * median is still slightly negative and the win rate is a coin flip. Waiting
+ * there is a tail bet — it usually costs a little and occasionally saves a lot.
+ * That is a defensible thing for a rebalancer to do, since the drift is not
+ * going anywhere, but it is not the same claim as "waiting is usually better",
+ * and this comment exists so nobody makes the stronger claim by accident.
+ *
+ * The 3% move threshold survives unchanged: it beats 2% in both windows, and 5%
+ * scores better still but fires on 0.4-0.8% of bars, which is too rare to be
+ * worth the extra tail risk of never firing when it matters.
  */
 export function isMoveInProgress(
   s: AssetSignals,
   driftPp: number,
   opts: { volRatioThreshold?: number; move4hThreshold?: number } = {},
 ): boolean {
-  const volRatioThreshold = opts.volRatioThreshold ?? 1.3;
+  const volRatioThreshold = opts.volRatioThreshold ?? 1.5;
   const move4hThreshold = opts.move4hThreshold ?? 3;
   if (s.volRatio < volRatioThreshold) return false;
   if (Math.abs(s.priceChange4hPct) < move4hThreshold) return false;

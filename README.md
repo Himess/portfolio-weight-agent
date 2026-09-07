@@ -423,7 +423,7 @@ Full behaviour, thresholds, measured frequency and setup:
 | `volScale` | `clamp((realizedVol / 60%)^(2/3), 0.6, 2.5)`, from 14 days of hourly closes — a volatile asset gets a wider band because its drift mostly reverses |
 | Slippage | walk real order-book levels to the required depth; VWAP vs mid |
 | Cost/benefit | `estimatedCostUsd / max(driftReductionPp, 0.01)` — the price of one point of correction |
-| `volRatio` | 4h vs 24h stdev of hourly log returns |
+| `volRatio` | 4h vs 24h stdev of hourly log returns. Gates the falling-knife flag at ≥1.5 with a 4h move ≥3% — both measured, `npm run knife` |
 
 Two notes worth having in writing, because both caused a real bug during the build:
 
@@ -511,6 +511,80 @@ mechanism.
 
 None of this was arranged. Loosening the bands would produce more HOLDs and a
 worse agent, which is the kind of thing that reads as tuned for a demo.
+
+---
+
+## The two constants that gate that judgment
+
+`falling_knife` is the only arm the judgment layer actually used to decline
+anything, and it is switched on by two numbers: `volRatio >= 1.3` and a 4h move
+of at least 3%. Every other threshold in this project was swept against a year
+of real closes. **Those two were guessed** — which made them the least-supported
+numbers in the codebase and, awkwardly, the ones carrying the most weight.
+
+`npm run knife` measures them. One question, asked of every hourly bar: when the
+flag fires, does the move continue?
+
+```
+benefit = ((P[t+24h] − P[t]) / P[t]) × sign(4h move), in bps
+```
+
+Positive means waiting got a better price for the trade the drift implies — an
+overweight that kept rising sells higher later, an underweight that kept falling
+buys cheaper later. Both collapse to "the move continued". Two windows, picked
+so they could disagree:
+
+| `volRatio` at move ≥3% | majors — mean / median / won | volatile mix — mean / median / won |
+|---|---|---|
+| ≥ 1.0 | +2.5 / +10.8 / 51% | +11.9 / −29.3 / 47% |
+| ≥ 1.3 *(shipped before)* | +19.6 / +29.5 / 53% | +17.2 / −17.7 / 48% |
+| **≥ 1.5 (shipped now)** | **+45.6 / +47.0 / 56%** | **+22.0 / −5.8 / 49%** |
+| ≥ 2.0 | +70.0 / +87.2 / 61% | **−23.5** / +7.1 / 50% |
+
+*majors = BTC/ETH/SOL/AVAX, 34,576 hourly bars · volatile mix = BTC/ETH/SUI/TAO/WLD, 43,294*
+
+```bash
+npm run klines -- --symbols BTC,ETH,SUI,TAO,WLD --days 365 --out data/window-volatile.json
+npm run knife                                          # majors, the default window
+npm run knife -- --data data/window-volatile.json      # the out-of-sample check
+```
+
+Both windows are regenerated from Binance, not shipped — they are large and
+the fetch is the point. Neither sweep calls a model.
+
+**Only one row moves the right way in both windows, so only one change was
+made: 1.3 → 1.5.** The move threshold stays at 3%; it beats 2% in both windows,
+and 5% scores better but fires on 0.4–0.8% of bars, too rare to rely on.
+
+The interesting part is the row below it. On majors, `volRatio ≥ 2.0` is the
+best cell in the table by a wide margin. On the volatile basket the mean goes
+**negative**. Adopting 2.0 on the strength of the first column is exactly the
+shape of fitting a constant to one dataset, so it was not adopted — the evidence
+stops at 1.5 and so did the change.
+
+Three more things this measurement says, including the ones that do not flatter
+the flag:
+
+- **The baseline is what is really being separated.** Bars with the same 4h move
+  but a calm `volRatio` score −55bps (majors) and −34bps (volatile). So the flag
+  is not identifying reliably good bars so much as excluding bars that
+  mean-revert. That is still worth having, but it is a different claim.
+- **On volatile assets, waiting is a tail bet.** The median is still slightly
+  negative at 1.5 and the win rate is a coin flip. It usually costs a little and
+  occasionally saves a lot. Defensible for a rebalancer — the drift is not going
+  anywhere — but not the same as "waiting is usually better", and the code
+  comment in [`signals.ts`](src/core/signals.ts) says so, so nobody upgrades the
+  claim by accident.
+- **No recorded decision changed.** All three declined legs in the logs above
+  fired at `volRatio` **1.94, 2.14 and 2.23** — comfortably clear of both the old
+  threshold and the new one, as does the captured HOLD (AVAX at 1.93). The
+  constant had been sitting well below where the agent's decisions were actually
+  happening. Raising it makes the flag fire less on bars that were never going
+  to change an answer.
+
+Which also means this retune could not have been used to manufacture a better
+demo, in either direction: the evidence in this README is the same evidence
+before and after.
 
 ---
 

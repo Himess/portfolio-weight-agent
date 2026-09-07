@@ -480,7 +480,7 @@ describe("signals", () => {
     const calm = Array.from({ length: 21 }, (_, i) => 100 + (i % 2) * 0.01);
     const spike = [101, 97, 103, 96, 91];
     const s = computeSignals("ETH", mkKlines([...calm, ...spike]));
-    expect(s.volRatio).toBeGreaterThan(1.3);
+    expect(s.volRatio).toBeGreaterThan(1.5);
     expect(s.priceChange4hPct).toBeLessThan(-5);
     // The pair is what makes the falling-knife call: disorderly AND falling,
     // while we are underweight.
@@ -494,7 +494,7 @@ describe("signals", () => {
     const ramp = [101, 104, 108, 113, 119];
     const s = computeSignals("ETH", mkKlines([...calm, ...ramp]));
     expect(s.priceChange4hPct).toBeGreaterThan(5);
-    expect(s.volRatio).toBeLessThan(1.3);
+    expect(s.volRatio).toBeLessThan(1.5);
     expect(isMoveInProgress(s, 6)).toBe(false);
   });
 
@@ -509,6 +509,18 @@ describe("signals", () => {
     const s = computeSignals("BTC", mkKlines(Array(30).fill(100)));
     expect(Number.isFinite(s.volRatio)).toBe(true);
     expect(s.volRatio).toBe(1);
+  });
+
+  it("keeps the falling-knife threshold where the sweep left it", () => {
+    // Both constants are measured (npm run knife, two windows), so a silent
+    // drift back to a guessed value should break a test rather than a decision.
+    const base = { symbol: "SOL", realizedVol24h: 1, realizedVol4h: 2, volRatio: 1.5, priceChange4hPct: -4, priceChange24hPct: -6 };
+    expect(isMoveInProgress(base, -6)).toBe(true);
+    // 1.3 used to fire here; the volatile window says those bars did not pay.
+    expect(isMoveInProgress({ ...base, volRatio: 1.4 }, -6)).toBe(false);
+    // The move threshold is unchanged at 3%.
+    expect(isMoveInProgress({ ...base, priceChange4hPct: -3 }, -6)).toBe(true);
+    expect(isMoveInProgress({ ...base, priceChange4hPct: -2.9 }, -6)).toBe(false);
   });
 
   it("detects a falling knife only when the move matches the drift sign", () => {

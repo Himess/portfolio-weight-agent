@@ -25,7 +25,8 @@
     "bundle": "node --import tsx scripts/bundle.ts",
     "mcp": "node --env-file-if-exists=.env --import tsx src/mcp/stdio.ts",
     "mcp:check": "node --env-file-if-exists=.env --import tsx scripts/mcp-check.ts",
-    "decisions": "node --env-file-if-exists=.env --import tsx scripts/decision-log.ts"
+    "decisions": "node --env-file-if-exists=.env --import tsx scripts/decision-log.ts",
+    "knife": "node --env-file-if-exists=.env --import tsx scripts/knife-sweep.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

@@ -228,8 +228,10 @@ rebalance, user's stated preference (`patient` | `balanced` | `tight`).
 
 **The HOLD case must be reachable and must be demonstrated.** Legitimate reasons to hold:
 
-- The move causing the drift is still in progress (`volRatio` high, large `priceChange4h` in the
-  direction of the drift) — buying into it is catching a falling knife.
+- The move causing the drift is still in progress (`volRatio` >= 1.5 and a 4h move >= 3% in the
+  direction of the drift) — buying into it is catching a falling knife. Both thresholds are
+  measured rather than chosen (`npm run knife`, two windows); the reasoning, including what the
+  measurement does *not* support, is in the comment on `isMoveInProgress`.
 - `costPerPpUsd` is high relative to portfolio size — the cure costs more than the disease.
 - The whole market moved together; absolute values changed but relative weights barely did.
 - Volatility spike means bands should be temporarily wider.

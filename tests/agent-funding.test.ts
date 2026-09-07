@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { runReview } from "../src/agent";
 import { syntheticBook } from "../src/core/slippage";
-import type { Allocation, ExchangeInfo, Kline, MarketAdapter, OrderBook } from "../src/types";
+import type { MarketAdapter } from "../src/adapters/types";
+import type { Allocation, ExchangeInfo, Kline, OrderBook } from "../src/types";
 
 /**
  * The funding bug, through the real agent rather than the unit under it.
@@ -22,13 +23,13 @@ const PRICES: Record<string, number> = { BTC: 100_000, ETH: 4_000, USDT: 1 };
 
 function market(exchangeInfo: ExchangeInfo): MarketAdapter {
   return {
-    async getPrices(symbols) {
-      return Object.fromEntries(symbols.map((s) => [s, PRICES[s] ?? 0]));
+    async getPrices(symbols: string[]) {
+      return Object.fromEntries(symbols.map((s: string) => [s, PRICES[s] ?? 0]));
     },
     async getKlines(): Promise<Kline[]> {
       return [];
     },
-    async getOrderBook(symbol): Promise<OrderBook> {
+    async getOrderBook(symbol: string): Promise<OrderBook> {
       return syntheticBook(`${symbol}USDT`, PRICES[symbol] ?? 1);
     },
     async getExchangeInfo() {
