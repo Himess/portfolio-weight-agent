@@ -1,0 +1,268 @@
+{
+  "ranAt": "2026-09-07T13:43:02.882Z",
+  "dataset": "demo-window.json",
+  "provider": "Gemini (free tier) · gemini-flash-lite-latest",
+  "tracking": "balanced",
+  "bands": {
+    "absoluteFloorPp": 0.7,
+    "relativeBandPct": 0.06,
+    "absoluteCapPp": 1.5
+  },
+  "checkedEveryBars": 24,
+  "observeOnly": false,
+  "startNavUsd": 100000,
+  "allocation": {
+    "cashSymbol": "USDT",
+    "targets": [
+      {
+        "kind": "asset",
+        "symbol": "BTC",
+        "weight": 0.3
+      },
+      {
+        "kind": "asset",
+        "symbol": "ETH",
+        "weight": 0.19999999999999998
+      },
+      {
+        "kind": "asset",
+        "symbol": "SOL",
+        "weight": 0.19999999999999998
+      },
+      {
+        "kind": "asset",
+        "symbol": "AVAX",
+        "weight": 0.19999999999999998
+      },
+      {
+        "kind": "asset",
+        "symbol": "USDT",
+        "weight": 0.1
+      }
+    ]
+  },
+  "note": "Every check where something was outside its band, in order, with fills applied so each decision changes what the next one sees. Checks with nothing outside a band are omitted: the agent was never asked, and logging them as HOLDs would pad the record with silence.",
+  "summary": {
+    "decisionPoints": 9,
+    "candidateLegs": 13,
+    "acceptedLegs": 12,
+    "rejectedLegs": 1,
+    "rejectionRatePct": 7.7,
+    "rejectionsByFactor": {
+      "falling_knife": 1
+    },
+    "holds": 0,
+    "partials": 1,
+    "rebalances": 8,
+    "usedFallback": 0,
+    "distinctHoldReasons": [],
+    "totalCostUsd": 24.23
+  },
+  "entries": [
+    {
+      "bar": 102,
+      "date": "2025-09-11",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.67,
+      "navUsd": 106593.24,
+      "outsideBand": [
+        "AVAX",
+        "BTC",
+        "ETH"
+      ],
+      "actedOn": [
+        "AVAX",
+        "BTC",
+        "ETH"
+      ],
+      "declined": [],
+      "candidateLegs": 3,
+      "acceptedLegs": 3,
+      "rejectedLegs": [],
+      "reason": "AVAX, BTC, and ETH have all crossed their tolerances after recent market shifts.",
+      "costUsd": 5.37,
+      "fellBack": false
+    },
+    {
+      "bar": 150,
+      "date": "2025-09-13",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.18,
+      "navUsd": 110590.05,
+      "outsideBand": [
+        "SOL"
+      ],
+      "actedOn": [
+        "SOL"
+      ],
+      "declined": [],
+      "candidateLegs": 1,
+      "acceptedLegs": 1,
+      "rejectedLegs": [],
+      "reason": "Solana has crossed its tolerance threshold as it drifted upward.",
+      "costUsd": 1.83,
+      "fellBack": false
+    },
+    {
+      "bar": 270,
+      "date": "2025-09-18",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.16,
+      "navUsd": 112354.32,
+      "outsideBand": [
+        "BTC"
+      ],
+      "actedOn": [
+        "BTC"
+      ],
+      "declined": [],
+      "candidateLegs": 1,
+      "acceptedLegs": 1,
+      "rejectedLegs": [],
+      "reason": "Bitcoin has crossed its tolerance band while the rest of the portfolio remains stable.",
+      "costUsd": 1.24,
+      "fellBack": false
+    },
+    {
+      "bar": 294,
+      "date": "2025-09-19",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.34,
+      "navUsd": 115526.73,
+      "outsideBand": [
+        "AVAX"
+      ],
+      "actedOn": [
+        "AVAX"
+      ],
+      "declined": [],
+      "candidateLegs": 1,
+      "acceptedLegs": 1,
+      "rejectedLegs": [],
+      "reason": "AVAX has climbed past its tolerance band following a strong twenty-four-hour gain.",
+      "costUsd": 3.25,
+      "fellBack": false
+    },
+    {
+      "bar": 390,
+      "date": "2025-09-23",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.62,
+      "navUsd": 108301.53,
+      "outsideBand": [
+        "SOL",
+        "ETH"
+      ],
+      "actedOn": [
+        "SOL",
+        "ETH"
+      ],
+      "declined": [],
+      "candidateLegs": 2,
+      "acceptedLegs": 2,
+      "rejectedLegs": [],
+      "reason": "Both Solana and Ethereum have crossed their tolerance bands as the market has drifted over the past four days.",
+      "costUsd": 3.41,
+      "fellBack": false
+    },
+    {
+      "bar": 462,
+      "date": "2025-09-26",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.01,
+      "navUsd": 100737.71,
+      "outsideBand": [
+        "BTC"
+      ],
+      "actedOn": [
+        "BTC"
+      ],
+      "declined": [],
+      "candidateLegs": 1,
+      "acceptedLegs": 1,
+      "rejectedLegs": [],
+      "reason": "Bitcoin has crossed its tolerance band and drifted above its target weight.",
+      "costUsd": 1.79,
+      "fellBack": false
+    },
+    {
+      "bar": 630,
+      "date": "2025-10-03",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 2.04,
+      "navUsd": 111225.95,
+      "outsideBand": [
+        "AVAX"
+      ],
+      "actedOn": [
+        "AVAX"
+      ],
+      "declined": [],
+      "candidateLegs": 1,
+      "acceptedLegs": 1,
+      "rejectedLegs": [],
+      "reason": "AVAX has drifted outside its tolerance band and crossed the threshold for correction.",
+      "costUsd": 2.48,
+      "fellBack": false
+    },
+    {
+      "bar": 726,
+      "date": "2025-10-07",
+      "verdict": "REBALANCE",
+      "primaryFactor": "drift_magnitude",
+      "totalDriftPp": 1.84,
+      "navUsd": 113574.51,
+      "outsideBand": [
+        "ETH"
+      ],
+      "actedOn": [
+        "ETH"
+      ],
+      "declined": [],
+      "candidateLegs": 1,
+      "acceptedLegs": 1,
+      "rejectedLegs": [],
+      "reason": "Ethereum has crossed its tolerance threshold and drifted outside its band.",
+      "costUsd": 1.76,
+      "fellBack": false
+    },
+    {
+      "bar": 822,
+      "date": "2025-10-11",
+      "verdict": "PARTIAL",
+      "primaryFactor": "falling_knife",
+      "totalDriftPp": 4.66,
+      "navUsd": 94920.5,
+      "outsideBand": [
+        "AVAX",
+        "BTC"
+      ],
+      "actedOn": [
+        "BTC"
+      ],
+      "declined": [
+        "AVAX"
+      ],
+      "candidateLegs": 2,
+      "acceptedLegs": 1,
+      "rejectedLegs": [
+        {
+          "side": "BUY",
+          "symbol": "AVAX",
+          "notionalUsd": 3626.6,
+          "factor": "falling_knife"
+        }
+      ],
+      "reason": "AVAX is dropping sharply and the move is still running, so buying it now would be catching a falling knife.",
+      "costUsd": 3.1,
+      "fellBack": false
+    }
+  ]
+}

@@ -147,8 +147,13 @@ export function applyEdits(
   const cashIndex = out.findIndex((t) => t.kind === "asset" && t.symbol === opts.cashSymbol);
   let cashAfter = cashBefore;
 
-  if (cashIndex >= 0) {
-    // Only touch cash if the owner did not just set it themselves.
+  if (cashIndex >= 0 && applied.length > 0) {
+    // `applied.length > 0` matters: an instruction whose every edit was
+    // rejected must leave the allocation exactly as it was. It did not — cash
+    // was still recomputed as 100 minus the rest, so "remove L1s" (which the
+    // router expanded into two symbols that are not top-level legs, both
+    // rejected) silently drove the cash leg to zero and left the allocation at
+    // 110%. A failed command has to be a no-op.
     const cashWasEdited = applied.some((a) => a.symbol === opts.cashSymbol);
     if (!cashWasEdited) {
       cashAfter = Math.max(0, round2(100 - nonCash));

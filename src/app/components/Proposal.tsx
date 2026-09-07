@@ -201,6 +201,47 @@ export function ProposalView({
           </div>
         ) : null}
 
+        {/*
+          The legs it turned down, in the same card as the ones it is sending.
+          This is the whole difference from a threshold rule and it existed only
+          in the payload: a bot fires every breached leg, and here two positions
+          crossed the same band in the same check and got different answers.
+          Side by side is the only way that reads at a glance.
+        */}
+        {proposal.declined.length > 0 && (
+          <div style={{ borderTop: "1px solid var(--line)" }}>
+            <div className="lbl" style={{ padding: "13px 22px", color: "var(--ink-3)" }}>
+              Declined in the same check
+            </div>
+            {proposal.declined.map((c) => (
+              <div
+                key={c.id}
+                className="refused-row"
+                style={{ padding: "0 22px 14px", display: "flex", alignItems: "center", gap: 14 }}
+              >
+                <TokenLogo symbol={c.symbol} size={28} />
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <div className="strike" style={{ fontSize: 14.5, fontWeight: 650 }}>
+                    {c.side === "SELL" ? "Sell" : "Buy"} <span className="m">{qty(c.qty)}</span>{" "}
+                    {c.symbol}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 3 }}>
+                    sized against live depth · {c.slippageBps.toFixed(1)} bps expected slippage
+                  </div>
+                </div>
+                <div className="m strike" style={{ fontSize: 14.5, fontWeight: 650, minWidth: 90 }}>
+                  {usd(c.estNotionalUsd)}
+                </div>
+              </div>
+            ))}
+            <div style={{ padding: "0 22px 16px", fontSize: 12.5, color: "var(--ink-2)", maxWidth: "68ch", lineHeight: 1.55 }}>
+              Outside the same band as the legs above, and not sent —{" "}
+              {FACTOR[timing.primaryFactor]?.toLowerCase() ?? timing.primaryFactor}.{" "}
+              {timing.reasoning.split(/(?<=[.!?])\s/).slice(-1)[0]}
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "18px 22px" }}>
           <button className="btn btn-primary" onClick={onApprove}>
             Approve — send to Binance

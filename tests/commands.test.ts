@@ -183,4 +183,41 @@ describe("typed instructions", () => {
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.errors.join(" ")).toMatch(/SOL/);
   });
+
+  it("leaves the allocation untouched when every edit is rejected", () => {
+    // Caught in the browser: the router expanded "remove L1s" into its two
+    // member symbols, neither of which is a top-level leg, so both were
+    // rejected -- and cash was still recomputed as 100 minus the rest, which
+    // drove it to zero and left the allocation at 110%. A command that does
+    // nothing must change nothing.
+    const before = JSON.parse(JSON.stringify(base));
+    const r = applyEdits(
+      base,
+      [
+        { op: "remove", symbol: "SOL" },
+        { op: "remove", symbol: "AVAX" },
+      ],
+      opts,
+    );
+    expect(r.applied).toEqual([]);
+    expect(r.rejected).toHaveLength(2);
+    expect(r.targets).toEqual(before);
+    expect(r.totalPct).toBe(100);
+    expect(r.cashDeltaPp).toBe(0);
+  });
+
+  it("still lets cash absorb when at least one edit lands", () => {
+    const r = applyEdits(
+      base,
+      [
+        { op: "remove", symbol: "NOPE" },
+        { op: "set", symbol: "BTC", weightPct: 50 },
+      ],
+      opts,
+    );
+    expect(r.applied).toHaveLength(1);
+    expect(r.rejected).toHaveLength(1);
+    expect(r.cashDeltaPp).toBe(-10);
+    expect(r.totalPct).toBe(100);
+  });
 });

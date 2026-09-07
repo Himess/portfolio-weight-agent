@@ -71,6 +71,14 @@ type Entry = {
   outsideBand: string[];
   actedOn: string[];
   declined: string[];
+  /**
+   * Legs, not verdicts. A verdict is one word for a whole check; the decision
+   * that distinguishes this from a threshold rule happens per leg, so that is
+   * what gets counted.
+   */
+  candidateLegs: number;
+  acceptedLegs: number;
+  rejectedLegs: { side: string; symbol: string; notionalUsd: number; factor: string }[];
   reason: string;
   costUsd: number | null;
   fellBack: boolean;
@@ -83,6 +91,7 @@ async function main() {
   const every = Number(arg("every", "336")); // fortnightly on hourly bars
   const pace = Number(arg("pace", "3000"));
   const navUsd = Number(arg("nav", "100000"));
+  const observeOnly = process.argv.includes("--no-act");
   const out = path.resolve(arg("out", "docs/decision-log.json"));
 
   const provider = resolveProvider();
@@ -112,7 +121,7 @@ async function main() {
   console.log(
     `Allocation: ${ALLOCATION.targets.map((t) => `${t.kind === "asset" ? t.symbol : t.label} ${(t.weight * 100).toFixed(0)}%`).join(" / ")}`,
   );
-  console.log(`Provider: ${provider.label}\n`);
+  console.log(`Provider: ${provider.label}${observeOnly ? "  ·  OBSERVE ONLY, no fills applied" : ""}\n`);
 
   const entries: Entry[] = [];
   let lastActionBar = from;
@@ -120,7 +129,46 @@ async function main() {
   const maxChecks = Number(arg("checks", "9999"));
   let checks = 0;
 
-  for (let bar = from + every; bar < adapter.length && checks < maxChecks; bar += every) {
+  /**
+   * --case replays the path *up to* a dated decision and stops there.
+   *
+   * Not the single bar. Jumping straight to 2025-10-11 gives a different
+   * answer from reaching it — REBALANCE with one leg instead of PARTIAL with a
+   * rejection — because by then the walk has already rebalanced several times
+   * and the portfolio is not the one that was bought. A decision is a function
+   * of the path, and replaying the bar alone silently replays a different
+   * portfolio.
+   *
+   * Note also what this cannot promise: the *verdict* may still vary between
+   * runs. Gemini's free tier does not repeat itself even at temperature 0 (see
+   * docs/telegram-alerts.md). Every figure will be identical; which side of a
+   * marginal call the model lands on may not be.
+   */
+  const wantedDate = arg("case", "");
+
+  const bars: number[] = [];
+  const series = dataset.klines[dataset.symbols[0]];
+  let stopAfter = Infinity;
+
+  if (wantedDate) {
+    const idx = series.findIndex(
+      (k) => new Date(k.openTime).toISOString().slice(0, 10) === wantedDate,
+    );
+    if (idx < 0) {
+      console.error(`No bar in this window falls on ${wantedDate}.`);
+      process.exit(1);
+    }
+    stopAfter = idx;
+    console.log(`--case ${wantedDate} -> replaying the path up to bar ${idx}
+`);
+  }
+
+  for (let b = from + every; b < adapter.length && bars.length < maxChecks; b += every) {
+    bars.push(b);
+    if (b >= stopAfter) break;
+  }
+
+  for (const bar of bars) {
     checks += 1;
     adapter.seek(bar);
     const date = new Date(dataset.klines[dataset.symbols[0]][bar].openTime).toISOString().slice(0, 10);
@@ -153,7 +201,11 @@ async function main() {
       askedLast24h: 0,
     });
 
-    const acted = proposal.orderedTrades;
+    // With --no-act nothing executes: the portfolio stays exactly as bought,
+    // drift accumulates, and the agent faces a situation that has been allowed
+    // to get worse. That is the regime the judgment layer is for, and the only
+    // way to see whether the two regimes genuinely differ.
+    const acted = observeOnly ? [] : proposal.orderedTrades;
     for (const t of acted) {
       account.applyFill({
         symbol: t.symbol,
@@ -175,6 +227,17 @@ async function main() {
       outsideBand: outside,
       actedOn: [...new Set(acted.map((t) => t.symbol))],
       declined: [...new Set(proposal.declined.map((c) => c.symbol))],
+      candidateLegs: proposal.orderedTrades.length + proposal.declined.length,
+      acceptedLegs: proposal.orderedTrades.length,
+      rejectedLegs: proposal.declined.map((c) => ({
+        side: c.side,
+        symbol: c.symbol,
+        notionalUsd: Number(c.estNotionalUsd.toFixed(2)),
+        // One factor per decision, applied to the legs that decision declined.
+        // Labelled rather than implied: the model gives a reason for the call,
+        // not a separate one for each leg.
+        factor: proposal.timing.primaryFactor,
+      })),
       reason: proposal.timing.reasoning.split(/(?<=[.!?])\s/)[0]?.trim() ?? "",
       costUsd: acted.length
         ? Number(acted.reduce((s, t) => s + t.estFeeUsd + t.estSlippageUsd, 0).toFixed(2))
@@ -194,6 +257,12 @@ async function main() {
   const holds = entries.filter((e) => e.verdict === "HOLD");
   const factors = [...new Set(holds.map((e) => e.primaryFactor))];
 
+  const rejected = entries.flatMap((e) => e.rejectedLegs);
+  const rejectionsByFactor: Record<string, number> = {};
+  for (const r of rejected) rejectionsByFactor[r.factor] = (rejectionsByFactor[r.factor] ?? 0) + 1;
+  const candidateLegs = entries.reduce((n, e) => n + e.candidateLegs, 0);
+  const acceptedLegs = entries.reduce((n, e) => n + e.acceptedLegs, 0);
+
   const payload = {
     ranAt: new Date().toISOString(),
     dataset: path.basename(dataPath),
@@ -201,6 +270,7 @@ async function main() {
     tracking: preference,
     bands,
     checkedEveryBars: every,
+    observeOnly,
     startNavUsd: navUsd,
     allocation: ALLOCATION,
     note:
@@ -209,6 +279,14 @@ async function main() {
       "the agent was never asked, and logging them as HOLDs would pad the record with silence.",
     summary: {
       decisionPoints: entries.length,
+      // The headline is leg-level. "PARTIAL" says a decision was split; it does
+      // not say how much of it was declined.
+      candidateLegs,
+      acceptedLegs,
+      rejectedLegs: rejected.length,
+      rejectionRatePct:
+        candidateLegs > 0 ? Number(((rejected.length / candidateLegs) * 100).toFixed(1)) : 0,
+      rejectionsByFactor,
       holds: holds.length,
       partials: entries.filter((e) => e.verdict === "PARTIAL").length,
       rebalances: entries.filter((e) => e.verdict === "REBALANCE").length,
@@ -222,8 +300,17 @@ async function main() {
   await mkdir(path.dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(`\n${entries.length} decision points · ${holds.length} holds · ${payload.summary.rebalances} rebalances`);
+  console.log(
+    `\n${entries.length} decision points · ${holds.length} holds · ${payload.summary.rebalances} rebalances`,
+  );
+  console.log(
+    `legs: ${candidateLegs} offered · ${acceptedLegs} accepted · ${rejected.length} rejected ` +
+      `(${payload.summary.rejectionRatePct}%)`,
+  );
   console.log(`hold reasons: ${factors.join(", ") || "none"}`);
+  console.log(
+    `rejection reasons: ${Object.entries(rejectionsByFactor).map(([k, v]) => `${k} x${v}`).join(", ") || "none"}`,
+  );
   console.log(`Wrote ${path.relative(process.cwd(), out)}`);
 }
 

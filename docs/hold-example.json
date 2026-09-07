@@ -1,7 +1,7 @@
 {
   "capturedAt": "2026-09-07T00:26:34.190Z",
-  "provider": "Gemini (free tier) · gemini-flash-lite-latest",
-  "note": "A real HOLD from the judgment layer. A threshold rule would have traded here: the position is outside its band. The agent declined and said why.",
+  "provider": "Gemini (free tier) \u00b7 gemini-flash-lite-latest",
+  "note": "A real HOLD from the judgment layer -- not the deterministic fallback, which the capture script rejects. Context matters and was missing: this portfolio was bought once and LEFT ALONE FOR WEEKS, so drift reached 4.9pp with every breached position mid-move, and nothing was worth sending. On a portfolio checked daily and corrected each time that situation does not arise -- across 61 measured decision points there were zero full HOLDs, and the same judgment appeared instead as a declined leg (see docs/decision-log.json, 2025-10-11). Two regimes, one mechanism. Captured on the pre-retune bands: the recorded bandPp figures correspond to no shipped setting today, but the decision reproduces -- AVAX breaches alone under 'patient' too.",
   "replay": {
     "dataset": "demo-window.json",
     "bar": 393,

@@ -52,6 +52,9 @@ Pick exactly one intent:
 
 Rules that matter:
 
+- A basket is addressed by its LABEL, exactly as shown in currentAllocation —
+  "remove L1s" is one edit with symbol "L1s", not two edits for its members.
+  The members are not top-level legs and removing them individually fails.
 - Only use tickers from the tradable list you are given. If the owner names
   something that is not on it, do not substitute a similar one — return the
   symbol they said and let the checker reject it, or use "unsupported" and say

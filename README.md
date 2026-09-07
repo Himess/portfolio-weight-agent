@@ -2,8 +2,10 @@
 
 **Selling your winners and buying your losers is psychologically hard. The agent proposes it; you approve it.**
 
-You declare a target allocation once. The market moves. The agent watches the drift, decides whether
-acting is worth it *right now*, proposes the exact trades with a reason, and you approve.
+You declare a target allocation once. The market moves. The agent watches the drift and decides
+**which legs are worth correcting right now** — a threshold rule fires everything outside its band;
+this one gave two positions opposite answers in the same check, buying BTC and declining to buy AVAX
+while AVAX was still falling. It proposes the exact trades with a reason, and you approve.
 
 It runs two ways, on one engine:
 
@@ -426,50 +428,81 @@ Two notes worth having in writing, because both caused a real bug during the bui
 
 ---
 
-## Forty decision points, and what they actually show
+## Sixty-one decision points, and what measuring them actually found
 
 One captured HOLD is an anecdote. `npm run decisions` walks a captured window,
-checks the portfolio on a fixed cadence, runs the full loop at every check that
-finds something outside a band, and **applies the fills** — so each decision
-changes what the next one sees. Three runs are committed:
+runs the full loop wherever something is outside a band, and applies the fills,
+so each decision changes what the next one sees. Four runs are committed.
 
-| Run | Decision points | HOLD | PARTIAL | REBALANCE |
+**The first finding was not the one this README expected.**
+
+| Run | Decisions | HOLD | Legs offered | Legs declined |
 |---|---|---|---|---|
-| [majors, daily](docs/decision-log.json) | 13 | 0 | 2 | 11 |
-| [majors, fortnightly, a full year](docs/decision-log-fortnightly.json) | 18 | 0 | 1 | 17 |
-| [volatile mix, daily](docs/decision-log-volatile.json) | 9 | 0 | 0 | 9 |
+| [majors, daily](docs/decision-log.json) | 13 | 0 | 17 | 1 |
+| [majors, fortnightly, a full year](docs/decision-log-fortnightly.json) | 18 | 0 | 27 | 0 |
+| [volatile mix, daily](docs/decision-log-volatile.json) | 9 | 0 | 12 | 0 |
+| [majors, daily, **never rebalanced**](docs/decision-log-untouched.json) | 21 | 0 | 46 | 2 |
+| **total** | **61** | **0** | **102** | **3** |
 
-**Zero full HOLDs across forty decision points.** That is the honest headline,
-and it is not what the product's own README expected to find.
+**Zero full HOLDs across sixty-one decision points.** Not one. The product was
+built around "it can decide to do nothing", and measuring it says that almost
+never happens.
 
-The reason is structural rather than disappointing: *if you act on the agent's
-advice, drift never accumulates*. Every breach it corrects is a breach that
-never grows into the situation where waiting matters. The captured HOLD in
-[`hold-example.json`](docs/hold-example.json) is real, and it is on a portfolio
-bought once and **left alone for weeks** — 4.9pp of accumulated drift with AVAX
-still climbing hard. That is a different situation from a portfolio checked
-daily and corrected each time.
+The reason is structural rather than disappointing. If you act on the agent's
+advice, drift never accumulates — every breach it corrects is a breach that
+never grows into the situation where waiting matters. Left alone, the same
+window declines **2 of 46 legs (4.3%)** against **1 of 56 (1.8%)** when
+followed: judgment is about two and a half times more likely to change the
+answer once drift has been allowed to build. Both numbers are small, and three
+rejections is a demonstrated capability, not a rate anyone should extrapolate.
 
-What the logs do show is the same judgment expressed at leg level. On
-2025-10-11 both AVAX and BTC were outside their bands; the agent bought BTC and
-**declined AVAX**, `primaryFactor: falling_knife`:
+### So the claim is narrower than it was, and more specific
+
+Not "sometimes it does nothing". That is vague and, measured, mostly false.
+
+**It gives different answers to different legs of the same check.** A threshold
+rule fires everything outside the band. On 2025-10-11 two positions were outside
+the same band and got opposite answers:
 
 ```json
 { "date": "2025-10-11", "verdict": "PARTIAL", "primaryFactor": "falling_knife",
-  "outsideBand": ["AVAX", "BTC"], "actedOn": ["BTC"], "declined": ["AVAX"],
-  "reason": "Bitcoin has drifted outside its band and can be rebalanced safely today." }
+  "outsideBand": ["AVAX", "BTC"], "acceptedLegs": 1,
+  "rejectedLegs": [{ "side": "BUY", "symbol": "AVAX", "notionalUsd": 3626.60 }],
+  "reason": "AVAX is dropping sharply and the move is still running, so buying it now
+             would be catching a falling knife." }
 ```
 
-That leg reproduced on a second independent run, same date, same factor. So the
-claim survives, in a narrower and more accurate form than it was first stated:
+Note what the rejected leg *is*: a **buy** of the asset that had fallen. The
+product's own pitch is that buying your losers is psychologically hard — and the
+agent's refinement is that it is also wrong while they are still falling. It
+bought BTC and left AVAX alone.
 
-> The agent declines **legs**, not usually whole checks. "It can wait" shows up
-> as PARTIAL far more often than as HOLD, and a full HOLD needs every breached
-> position to be mid-move at once — which is rare unless drift has been left to
-> build.
+Reproduce it: `npm run decisions -- --data data/demo-window.json --from 30 --every 24 --case 2025-10-11`
 
-Declined trades are therefore a value in the payload, not a claim in prose:
-every proposal carries `declined[]`, sized and priced against real depth.
+That replays the *path* to the date, not the bar. Jumping straight to 2025-10-11
+returns REBALANCE with nothing declined, because by then the walk has rebalanced
+several times and the portfolio is not the one that was bought. A decision is a
+function of how you got there.
+
+It has now reproduced on three independent runs — same date, same factor, same
+asset. What it cannot promise is the verdict on a marginal call: Gemini's free
+tier does not repeat itself even at temperature 0. Every *figure* is identical
+every time, because the model is not allowed to produce one.
+
+### Where the single captured HOLD fits
+
+[`hold-example.json`](docs/hold-example.json) is real and stays. It is the same
+judgment in its extreme form, and the context matters: that portfolio was bought
+once and **left alone for weeks**, so drift reached 4.9pp with AVAX still
+climbing hard and *every* breached position was mid-move. Nothing was worth
+sending, so nothing was.
+
+On a portfolio checked daily and corrected each time, that situation does not
+arise — the same judgment shows up as a declined leg instead. Two regimes, one
+mechanism.
+
+None of this was arranged. Loosening the bands would produce more HOLDs and a
+worse agent, which is the kind of thing that reads as tuned for a demo.
 
 ---
 
