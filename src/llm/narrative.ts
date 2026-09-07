@@ -14,7 +14,13 @@
  * the class of figure that could mislead about money.
  */
 
-import type { OrderedTrade, Proposal, RebalanceContext, TimingDecision } from "../types";
+import type {
+  CandidateTrade,
+  OrderedTrade,
+  Proposal,
+  RebalanceContext,
+  TimingDecision,
+} from "../types";
 import { logDecision } from "./client";
 import { providerAvailable, structuredCall } from "./provider";
 import { NarrativeSchema } from "./schemas";
@@ -111,6 +117,72 @@ export function unnamedAssets(raw: string, symbols: string[]): string[] {
 }
 
 /**
+ * Sides the prose claims that the plan does not contain.
+ *
+ * Caught on the deployed site: the narrative read "Selling what went up allows
+ * us to buy SOL and AVAX" while the plan held two SELL legs and no buys at all.
+ * The root cause was elsewhere — two assets the active data source could not
+ * price, so they showed as 0% weight and produced no candidate — but nothing
+ * noticed the contradiction, and a proposal that describes trades it is not
+ * making is the worst thing this product can put on a screen.
+ *
+ * The rule is per symbol, per sentence, and deliberately narrow:
+ *
+ *   - Only symbols actually in the portfolio count, so "reduces your total
+ *     drift by 4.1pp" is not read as a claim to sell anything.
+ *   - A symbol is associated with the *nearest* side word in its sentence, so
+ *     "Selling what went up allows us to buy SOL" attributes BUY to SOL rather
+ *     than both sides to everything in the clause.
+ *   - A side word negated just before it ("not selling", "without buying") is
+ *     not a claim.
+ */
+const BUY_WORDS = /\b(buy|buys|buying|bought|purchase|purchases|purchasing|accumulate|accumulating)\b/gi;
+const SELL_WORDS = /\b(sell|sells|selling|sold|trim|trims|trimming|trimmed|offload|offloading)\b/gi;
+const NEGATION = /\b(not|never|no|without|avoid|avoiding|rather than|instead of)\b[^.!?]{0,24}$/i;
+
+export function claimedSidesNotInPlan(
+  text: string,
+  trades: { symbol: string; side: "BUY" | "SELL" }[],
+  portfolioSymbols: string[],
+): string[] {
+  const planned = new Set(trades.map((t) => `${t.symbol}:${t.side}`));
+  const violations = new Set<string>();
+
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    // Where each side word sits, ignoring the negated ones.
+    const marks: { at: number; side: "BUY" | "SELL" }[] = [];
+    for (const [re, side] of [
+      [BUY_WORDS, "BUY"],
+      [SELL_WORDS, "SELL"],
+    ] as const) {
+      re.lastIndex = 0;
+      for (const m of sentence.matchAll(re)) {
+        const before = sentence.slice(0, m.index ?? 0);
+        if (NEGATION.test(before)) continue;
+        marks.push({ at: m.index ?? 0, side });
+      }
+    }
+    if (marks.length === 0) continue;
+
+    for (const symbol of portfolioSymbols) {
+      // Word-boundary match so ETH does not fire inside a longer ticker.
+      const symbolRe = new RegExp(String.raw`(^|[^A-Z0-9])${symbol}([^A-Z0-9]|$)`, "g");
+      for (const hit of sentence.matchAll(symbolRe)) {
+        const at = (hit.index ?? 0) + hit[1].length;
+        const nearest = marks.reduce((best, m) =>
+          Math.abs(m.at - at) < Math.abs(best.at - at) ? m : best,
+        );
+        if (!planned.has(`${symbol}:${nearest.side}`)) {
+          violations.add(`${nearest.side} ${symbol}`);
+        }
+      }
+    }
+  }
+
+  return [...violations].sort();
+}
+
+/**
  * Any bare money/percentage/pp/bps figure outside a {{TOKEN}}.
  * Run against the raw model output, before substitution.
  */
@@ -197,6 +269,18 @@ export async function writeNarrative(
       return fallback;
     }
 
+    // Prose that describes trades the plan does not contain. Checked against
+    // the materialised legs, so it cannot pass by agreeing with intent.
+    const contradictions = claimedSidesNotInPlan(
+      raw,
+      trades,
+      ctx.portfolio.rows.map((r) => r.symbol),
+    );
+    if (contradictions.length > 0) {
+      logDecision("narrative", "fallback", `claims trades not in the plan: ${contradictions.join(", ")}`);
+      return fallback;
+    }
+
     const { out, unknown } = substitute(raw, tokens);
     if (unknown.length > 0) {
       logDecision("narrative", "fallback", `unknown placeholders: ${unknown.join(", ")}`);
@@ -256,8 +340,9 @@ export function buildProposal(
   execution: Proposal["execution"],
   trades: OrderedTrade[],
   narrative: string,
+  declined: CandidateTrade[] = [],
 ): Proposal {
-  return { context: ctx, timing, execution, orderedTrades: trades, narrative };
+  return { context: ctx, timing, execution, orderedTrades: trades, declined, narrative };
 }
 
 // --- formatting helpers: the single place figures become strings ------------

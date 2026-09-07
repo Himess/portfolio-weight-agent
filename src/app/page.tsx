@@ -79,7 +79,14 @@ type Ctx = {
   llmAvailable: boolean;
   telegram: boolean;
   model: string;
-  datasets: string[];
+  datasets: {
+    file: string;
+    label: string | null;
+    symbols: string[];
+    bars: number;
+    startsAt: number | null;
+    barMs: number;
+  }[];
   replay: {
     label: string | null;
     symbols: string[];
@@ -97,7 +104,10 @@ export default function Page() {
   const [preference, setPreference] = useState<Preference>("balanced");
   const [ctx, setCtx] = useState<Ctx | null>(null);
 
-  const [source, setSource] = useState<"replay" | "public" | "mcp">("replay");
+  // Live data is what the product is for. Replay is a demo device and sat
+  // first in the list looking like the normal way to use the app.
+  const [source, setSource] = useState<"replay" | "public" | "mcp">("public");
+  const [dataset, setDataset] = useState<string | null>(null);
   const [accountReady, setAccountReady] = useState(false);
   const [bar, setBar] = useState(8484);
   const [seedBar, setSeedBar] = useState(30);
@@ -185,6 +195,7 @@ export default function Page() {
           preference,
           source,
           bar,
+          dataset: source === "replay" ? (dataset ?? undefined) : undefined,
           seedBar: source === "replay" ? seedBar : undefined,
           seedNavUsd: 100_000,
           quantities:
@@ -335,6 +346,8 @@ export default function Page() {
           onAccountChange={setAccountReady}
           bar={bar}
           setBar={setBar}
+          dataset={dataset}
+          setDataset={setDataset}
           seedBar={seedBar}
           setSeedBar={setSeedBar}
           holdings={holdings}
@@ -460,6 +473,8 @@ function Allocate(props: {
   onAccountChange: (connected: boolean) => void;
   bar: number;
   setBar: (n: number) => void;
+  dataset: string | null;
+  setDataset: (f: string | null) => void;
   seedBar: number;
   setSeedBar: (n: number) => void;
   holdings: { symbol: string; qty: string }[];
@@ -476,6 +491,25 @@ function Allocate(props: {
 
   // The band that will actually apply to the position the user cares about
   // most. Flattened, so a basket is judged by its members' real weights.
+  // Symbols the chosen replay window cannot price. Flattened, so a basket is
+  // checked by its members rather than by its label.
+  const missingFromWindow = useMemo(() => {
+    if (props.source !== "replay" || !ctx) return [];
+    const chosen = ctx.datasets.find((d) => d.file === (props.dataset ?? ctx.datasets[0]?.file));
+    if (!chosen) return [];
+    const covered = new Set(chosen.symbols);
+    return Object.keys(flattenTargets({ targets, cashSymbol: CASH }))
+      .filter((sym) => sym !== CASH && !covered.has(sym))
+      .sort();
+  }, [props.source, props.dataset, ctx, targets]);
+
+  // The window actually in use, so the date sliders describe it rather than
+  // whichever one the server happens to load by default.
+  const activeWindow = useMemo(
+    () => ctx?.datasets.find((d) => d.file === (props.dataset ?? ctx.datasets[0]?.file)) ?? null,
+    [ctx, props.dataset],
+  );
+
   const largestWeight = useMemo(() => {
     const flat = Object.entries(flattenTargets({ targets, cashSymbol: CASH })).filter(
       ([symbol]) => symbol !== CASH,
@@ -879,31 +913,70 @@ function Allocate(props: {
               />
             )}
             <SourceBtn
-              on={props.source === "replay"}
-              disabled={!ctx?.replay}
-              onClick={() => props.setSource("replay")}
-              title="Replay"
-              note={ctx?.replay ? `${ctx.replay.symbols.join(", ")} · ${ctx.replay.bars} bars` : "no dataset — npm run klines"}
-            />
-            <SourceBtn
               on={props.source === "public"}
               onClick={() => props.setSource("public")}
-              title="Live public market data"
-              note="real depth; enter holdings yourself"
+              title="Live Binance market data"
+              note="real prices and depth; enter your holdings"
+            />
+            <SourceBtn
+              on={props.source === "replay"}
+              disabled={(ctx?.datasets.length ?? 0) === 0}
+              onClick={() => props.setSource("replay")}
+              title="Demo mode — replay a past window"
+              note={
+                (ctx?.datasets.length ?? 0) > 0
+                  ? "step through real history to see a decision"
+                  : "no dataset — npm run klines"
+              }
             />
           </div>
 
-          {props.source === "replay" && ctx?.replay && (
+          {/*
+            Coverage matters and used to be silent. A window only holds the
+            symbols it was captured with; anything else has no price, and a
+            missing price is an error rather than a zero.
+          */}
+          {props.source === "replay" && missingFromWindow.length > 0 && (
+            <p
+              role="alert"
+              style={{ fontSize: 11.5, color: "var(--red)", margin: "12px 0 0", lineHeight: 1.55 }}
+            >
+              This window has no prices for {missingFromWindow.join(", ")}. Pick another window,
+              switch to live data, or drop {missingFromWindow.length === 1 ? "it" : "them"} from the
+              allocation.
+            </p>
+          )}
+
+          {props.source === "replay" && (ctx?.datasets.length ?? 0) > 1 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+              {ctx!.datasets.map((d) => {
+                const on = (props.dataset ?? ctx!.datasets[0].file) === d.file;
+                return (
+                  <button
+                    key={d.file}
+                    onClick={() => props.setDataset(d.file)}
+                    className={on ? "pill pill-accent" : "pill pill-quiet"}
+                    style={{ cursor: "pointer", border: "1px solid var(--line)" }}
+                    title={`${d.symbols.join(", ")} · ${d.bars} bars`}
+                  >
+                    {d.symbols.join(" · ")}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {props.source === "replay" && activeWindow && (
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 12 }}>
               <Slider
-                label={`Bought the target allocation on ${barDate(ctx.replay, props.seedBar)}`}
-                max={Math.max(0, ctx.replay.bars - 2)}
+                label={`Bought the target allocation on ${barDate(activeWindow, props.seedBar)}`}
+                max={Math.max(0, activeWindow.bars - 2)}
                 value={props.seedBar}
                 onChange={props.setSeedBar}
               />
               <Slider
-                label={`Checking it on ${barDate(ctx.replay, props.bar)} — ${Math.max(0, Math.round(((props.bar - props.seedBar) * ctx.replay.barMs) / 86_400_000))} days later`}
-                max={ctx.replay.bars - 1}
+                label={`Checking it on ${barDate(activeWindow, props.bar)} — ${Math.max(0, Math.round(((props.bar - props.seedBar) * activeWindow.barMs) / 86_400_000))} days later`}
+                max={activeWindow.bars - 1}
                 value={props.bar}
                 onChange={props.setBar}
               />
@@ -981,8 +1054,14 @@ function Allocate(props: {
           className="btn btn-primary"
           style={{ width: "100%", padding: "15px 0", fontSize: 14.5 }}
           onClick={props.onReview}
-          disabled={props.busy || !validation.ok}
-          title={validation.ok ? undefined : validation.errors.join(" ")}
+          disabled={props.busy || !validation.ok || missingFromWindow.length > 0}
+          title={
+            !validation.ok
+              ? validation.errors.join(" ")
+              : missingFromWindow.length > 0
+                ? `This window cannot price ${missingFromWindow.join(", ")}.`
+                : undefined
+          }
         >
           {props.busy ? "Reviewing…" : "Review my portfolio"}
         </button>

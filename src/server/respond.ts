@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { MissingPriceError } from "../core/drift";
 import { HttpError, TimeoutError } from "../lib/http";
 import { firstIssue } from "../lib/api-contracts";
 
@@ -66,6 +67,21 @@ function upstreamName(url: string): string {
 export function failure(err: unknown, context: string): NextResponse<ApiError> {
   if (err instanceof ZodError) {
     return badRequest(firstIssue(err));
+  }
+
+  // The caller's fault, and fixable by them: they picked a data source that
+  // does not cover an asset they hold or target.
+  if (err instanceof MissingPriceError) {
+    return NextResponse.json(
+      {
+        error:
+          `${err.message} Switch to live market data, or drop ` +
+          `${err.symbols.length === 1 ? "that asset" : "those assets"} from the allocation.`,
+        code: "bad_request" as const,
+        retryable: false,
+      },
+      { status: 400 },
+    );
   }
 
   if (err instanceof TimeoutError) {

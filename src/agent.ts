@@ -15,9 +15,9 @@
 import type { MarketAdapter } from "./adapters/types";
 import { allocationSymbols } from "./core/allocation";
 import { bandsFor, volScales } from "./core/bands";
-import { DEFAULT_PLAN_CONFIG, generateCandidates } from "./core/candidates";
+import { DEFAULT_PLAN_CONFIG, declinedTrades, generateCandidates } from "./core/candidates";
 import { computeCostBenefit } from "./core/costbenefit";
-import { buildHoldings, computeDrift } from "./core/drift";
+import { MissingPriceError, buildHoldings, computeDrift, unpricedSymbols } from "./core/drift";
 import { computeSignals } from "./core/signals";
 import { decideExecution, materializeTrades } from "./llm/execution";
 import { buildProposal, writeNarrative } from "./llm/narrative";
@@ -66,6 +66,12 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
   ];
 
   const prices = await input.market.getPrices(symbols);
+
+  // Everything the allocation names, not only what is currently held: a target
+  // the data source cannot price is a buy candidate at an imaginary price.
+  const unpriced = unpricedSymbols(symbols, prices, cashSymbol);
+  if (unpriced.length > 0) throw new MissingPriceError(unpriced);
+
   const holdings = buildHoldings(input.quantities, prices, cashSymbol);
 
   // Recent history for every symbol, not just the drifting ones — the band has
@@ -152,7 +158,9 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
     const narrative = input.deterministicOnly
       ? `Holding — nothing outside its band.\n\n${timing.reasoning}`
       : await writeNarrative(ctx, timing, []);
-    return buildProposal(ctx, timing, null, [], narrative);
+    // Every candidate was declined. These are exactly the trades a threshold
+    // rule would have sent, already sized against real book depth.
+    return buildProposal(ctx, timing, null, [], narrative, candidates);
   }
 
   // ---- PARTIAL: re-derive candidates for the chosen subset only -----------
@@ -205,5 +213,11 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
     ? `${timing.action} — ${orderedTrades.length} trades.\n\n${timing.reasoning}`
     : await writeNarrative(finalCtx, timing, orderedTrades);
 
-  return buildProposal(finalCtx, timing, execution, orderedTrades, narrative);
+  // Declined = everything that was a candidate before the timing call, minus
+  // what is actually going out. Computed against the *original* candidate set:
+  // on a PARTIAL, workingCandidates has already dropped the assets timing
+  // declined, so filtering that would report nothing declined at all.
+  const declined = declinedTrades(candidates, orderedTrades);
+
+  return buildProposal(finalCtx, timing, execution, orderedTrades, narrative, declined);
 }

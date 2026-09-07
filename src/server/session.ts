@@ -14,28 +14,117 @@ import type { AdapterStatus } from "../adapters/types";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 
-let datasetCache: { file: string; data: ReplayDataset } | null = null;
+// Keyed by file: describeDatasets() reads every window, and a single-entry
+// cache would evict the default on every call.
+const datasetCache = new Map<string, ReplayDataset>();
 
+/** Does this parse as a replay window, rather than merely live in data/? */
+function isDataset(value: unknown): value is ReplayDataset {
+  if (typeof value !== "object" || value === null) return false;
+  const d = value as Partial<ReplayDataset>;
+  return Array.isArray(d.symbols) && d.symbols.length > 0 && typeof d.klines === "object";
+}
+
+/**
+ * Replay windows in data/.
+ *
+ * Filtered by shape, not by filename. Name-based filtering is how the watch
+ * store — data/watches.json, written by the Telegram layer — ended up being
+ * offered as a replay dataset and crashing the context route on a field it
+ * does not have. Anything in this directory that does not parse as a window is
+ * simply not one.
+ */
 export async function listDatasets(): Promise<string[]> {
+  let files: string[];
   try {
-    const files = await readdir(DATA_DIR);
-    return files.filter((f) => f.endsWith(".json") && !f.includes("journal"));
+    files = (await readdir(DATA_DIR)).filter((f) => f.endsWith(".json"));
   } catch {
     return [];
   }
+
+  const out: string[] = [];
+  for (const file of files) {
+    const cached = datasetCache.get(file);
+    if (cached) {
+      out.push(file);
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(await readFile(path.join(DATA_DIR, file), "utf8"));
+      if (!isDataset(parsed)) continue;
+      datasetCache.set(file, parsed);
+      out.push(file);
+    } catch {
+      // Unreadable or malformed is the same as not a dataset.
+    }
+  }
+  return out.sort();
 }
+
+/**
+ * The window the demo opens on when nothing is named.
+ *
+ * Not `files[0]`. That was alphabetical, so committing `demo-volatile.json`
+ * silently moved the default off `demo-window.json` and onto a dataset whose
+ * symbols the starting allocation does not contain — two positions then priced
+ * at zero and half the headline drift figure was an artifact.
+ */
+const DEFAULT_DATASET = "demo-window.json";
 
 export async function loadDataset(file?: string): Promise<ReplayDataset | null> {
   const files = await listDatasets();
   if (files.length === 0) return null;
-  const chosen = file && files.includes(file) ? file : files[0];
+  const chosen =
+    file && files.includes(file)
+      ? file
+      : files.includes(DEFAULT_DATASET)
+        ? DEFAULT_DATASET
+        : files[0];
 
-  if (datasetCache?.file === chosen) return datasetCache.data;
+  const cached = datasetCache.get(chosen);
+  if (cached) return cached;
 
   const raw = await readFile(path.join(DATA_DIR, chosen), "utf8");
   const data = JSON.parse(raw) as ReplayDataset;
-  datasetCache = { file: chosen, data };
+  datasetCache.set(chosen, data);
   return data;
+}
+
+export type DatasetInfo = {
+  file: string;
+  label: string | null;
+  symbols: string[];
+  bars: number;
+  /** Open time of the first bar, so the UI can show dates rather than indices. */
+  startsAt: number | null;
+  barMs: number;
+};
+
+/** Milliseconds per bar for the intervals the capture script emits. */
+export function barMsFor(interval: string): number {
+  if (interval === "4h") return 14_400_000;
+  if (interval === "1d") return 86_400_000;
+  return 3_600_000;
+}
+
+/** Every shipped window with what it covers. Cheap: each is read once and cached. */
+export async function describeDatasets(): Promise<DatasetInfo[]> {
+  const files = await listDatasets();
+  const out: DatasetInfo[] = [];
+  for (const file of files) {
+    const data = await loadDataset(file);
+    if (!data) continue;
+    out.push({
+      file,
+      label: data.label ?? null,
+      symbols: data.symbols,
+      bars: Math.min(...data.symbols.map((s) => data.klines[s]?.length ?? 0)),
+      startsAt: data.klines[data.symbols[0]]?.[0]?.openTime ?? null,
+      barMs: barMsFor(data.interval),
+    });
+  }
+  // The default first, so a picker rendering them in order leads with it.
+  return out.sort((a, b) => (a.file === "demo-window.json" ? -1 : b.file === "demo-window.json" ? 1 : 0));
 }
 
 export async function replayAdapter(file?: string, bar?: number) {

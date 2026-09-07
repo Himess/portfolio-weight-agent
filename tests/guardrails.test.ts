@@ -5,7 +5,7 @@ import { buildHoldings, computeDrift } from "../src/core/drift";
 import { computeCostBenefit } from "../src/core/costbenefit";
 import { syntheticBook } from "../src/core/slippage";
 import { deterministicExecution, materializeTrades } from "../src/llm/execution";
-import { findBareFigures, substitute, unnamedAssets } from "../src/llm/narrative";
+import { claimedSidesNotInPlan, findBareFigures, substitute, unnamedAssets } from "../src/llm/narrative";
 import { deterministicTiming } from "../src/llm/timing";
 import type { Allocation, ExchangeInfo, RebalanceContext } from "../src/types";
 
@@ -186,5 +186,58 @@ describe("a placeholder cannot stand in for an asset's name", () => {
   it("accepts a ticker in possessive or punctuated form", () => {
     const raw = "Head\n\nETH's weight is {{ETH_CURRENT}}, and BTC, at {{BTC_CURRENT}}, is fine.";
     expect(unnamedAssets(raw, symbols)).toEqual([]);
+  });
+});
+
+describe("the prose cannot describe trades the plan does not contain", () => {
+  const symbols = ["BTC", "ETH", "SOL", "AVAX", "USDT"];
+  const sells = [
+    { symbol: "BTC", side: "SELL" as const },
+    { symbol: "ETH", side: "SELL" as const },
+  ];
+
+  it("catches the contradiction that shipped", () => {
+    // Live on the deployed site: two SELL legs, no buys, and prose promising
+    // to buy the two assets the data source could not even price.
+    const text = "Selling what went up allows us to buy SOL and AVAX.";
+    expect(claimedSidesNotInPlan(text, sells, symbols)).toEqual(["BUY AVAX", "BUY SOL"]);
+  });
+
+  it("passes prose that matches the plan", () => {
+    const text = "We are selling BTC and ETH to bring both back to target.";
+    expect(claimedSidesNotInPlan(text, sells, symbols)).toEqual([]);
+  });
+
+  it("attributes a symbol to the nearest side word, not to every one", () => {
+    // Both sides appear; SOL belongs to "buy", which is adjacent.
+    const plan = [
+      { symbol: "BTC", side: "SELL" as const },
+      { symbol: "SOL", side: "BUY" as const },
+    ];
+    const text = "Selling BTC after its run lets us buy SOL while it is down.";
+    expect(claimedSidesNotInPlan(text, plan, symbols)).toEqual([]);
+  });
+
+  it("does not read 'reduces your total drift' as selling something", () => {
+    // A real narrative. "reduce" is not in the verb list precisely because of
+    // this sentence, and no symbol sits near a side word anyway.
+    const text = "This disciplined sale of winners reduces your total drift.";
+    expect(claimedSidesNotInPlan(text, sells, symbols)).toEqual([]);
+  });
+
+  it("ignores a negated claim", () => {
+    const text = "We are not buying SOL today.";
+    expect(claimedSidesNotInPlan(text, sells, symbols)).toEqual([]);
+  });
+
+  it("says nothing about a HOLD, where there is no plan to contradict", () => {
+    const text = "AVAX has drifted but the move is still running, so we are waiting.";
+    expect(claimedSidesNotInPlan(text, [], symbols)).toEqual([]);
+  });
+
+  it("does not fire on a ticker embedded in a longer one", () => {
+    const plan = [{ symbol: "BNSOL", side: "BUY" as const }];
+    const text = "We are buying BNSOL.";
+    expect(claimedSidesNotInPlan(text, plan, ["SOL", "BNSOL"])).toEqual([]);
   });
 });

@@ -9,7 +9,7 @@
  * returns 451 there). Only market data is mirrored — that is all we need here.
  */
 
-import { fetchJsonFrom } from "../lib/http";
+import { HttpError, fetchJsonFrom } from "../lib/http";
 import type { ExchangeInfo, Kline, OrderBook, SymbolFilters } from "../types";
 
 /** How long the tradable universe snapshot stays fresh. */
@@ -64,16 +64,39 @@ export class PublicAdapter implements MarketAdapter {
     return symbol.endsWith(this.quoteAsset) ? symbol : `${symbol}${this.quoteAsset}`;
   }
 
+  /**
+   * Spot prices, keyed by base symbol. Cash is 1.0 by definition.
+   *
+   * A symbol Binance does not list simply comes back absent — deciding whether
+   * that is fatal belongs to the caller, and it always is. It used to be worse
+   * than that: `/ticker/price?symbols=[...]` rejects the *entire* batch with
+   * `-1121 Invalid symbol` if one entry is unknown, so a single dust balance in
+   * a delisted token priced nothing at all and surfaced a raw Binance error.
+   * On that specific rejection the unknown pairs are dropped and the rest are
+   * fetched, so the caller gets the prices that do exist plus a clear gap.
+   */
   async getPrices(symbols: string[]): Promise<Record<string, number>> {
     const wanted = symbols.filter((s) => s !== this.quoteAsset);
     const out: Record<string, number> = { [this.quoteAsset]: 1 };
     if (wanted.length === 0) return out;
 
-    const pairs = wanted.map((s) => this.pair(s));
-    const query = encodeURIComponent(JSON.stringify(pairs));
-    const rows = await getJson<{ symbol: string; price: string }[]>(
-      `/api/v3/ticker/price?symbols=${query}`,
-    );
+    const fetchPairs = async (pairs: string[]) =>
+      getJson<{ symbol: string; price: string }[]>(
+        `/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(pairs))}`,
+      );
+
+    let rows: { symbol: string; price: string }[];
+    try {
+      rows = await fetchPairs(wanted.map((s) => this.pair(s)));
+    } catch (err) {
+      if (!(err instanceof HttpError && err.status === 400 && err.body.includes("-1121"))) throw err;
+
+      // Keep only what the exchange actually lists, then ask again.
+      const listed = new Set(await this.getTradableSymbols());
+      const known = wanted.filter((s) => listed.has(s));
+      if (known.length === 0) return out;
+      rows = await fetchPairs(known.map((s) => this.pair(s)));
+    }
 
     const byPair = new Map(rows.map((r) => [r.symbol, num(r.price)]));
     for (const s of wanted) {

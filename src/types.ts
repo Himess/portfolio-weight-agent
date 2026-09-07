@@ -279,5 +279,15 @@ export type Proposal = {
   timing: TimingDecision;
   execution: ExecutionDecision | null;
   orderedTrades: OrderedTrade[];
+  /**
+   * Trades that were sized and priced against real depth and then not sent.
+   *
+   * This is the product's whole claim, so it is part of the payload rather than
+   * something the prose alludes to. On a HOLD it is every candidate — exactly
+   * what a threshold rule would have fired. On a PARTIAL it is the legs the
+   * timing call left out, which are *not* recoverable from `context.candidates`
+   * because that set is regenerated for the chosen subset.
+   */
+  declined: CandidateTrade[];
   narrative: string;
 };

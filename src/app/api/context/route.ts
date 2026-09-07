@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { listDatasets, llmAvailable, loadDataset, providerLabel, publicAdapter } from "@/server/session";
+import { barMsFor, describeDatasets, llmAvailable, loadDataset, providerLabel, publicAdapter } from "@/server/session";
 import { telegramConfigured } from "@/server/telegram";
 
 export const runtime = "nodejs";
@@ -10,7 +10,9 @@ export const runtime = "nodejs";
  * is available, which replay datasets exist, and live prices for seeding.
  */
 export async function GET() {
-  const datasets = await listDatasets();
+  // Name and coverage for each, so the picker can say what a window contains
+  // and the app can refuse an allocation the window cannot price.
+  const datasets = await describeDatasets();
   const first = await loadDataset();
 
   let prices: Record<string, number> = {};
@@ -38,14 +40,7 @@ export async function GET() {
           // adapter. Send the window's real dates so the UI can say "23 Sep
           // 2025" instead of "bar 393".
           startsAt: first.klines[first.symbols[0]]?.[0]?.openTime ?? null,
-          barMs:
-            first.interval === "1h"
-              ? 3_600_000
-              : first.interval === "4h"
-                ? 14_400_000
-                : first.interval === "1d"
-                  ? 86_400_000
-                  : 3_600_000,
+          barMs: barMsFor(first.interval),
         }
       : null,
     prices,

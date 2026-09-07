@@ -28,6 +28,22 @@ export const DEFAULT_PLAN_CONFIG: PlanConfig = {
   feeRate: 0.001, // 10 bps taker, Binance spot default tier
 };
 
+/**
+ * Candidates that were sized and priced and then not sent.
+ *
+ * The product's claim is that it can decline, so what it declined has to be a
+ * value, not a sentence. Matched on side and symbol rather than candidate id:
+ * a PARTIAL regenerates its candidate set for the chosen subset, so the ids of
+ * the legs that were dropped no longer exist anywhere to compare against.
+ */
+export function declinedTrades(
+  candidates: CandidateTrade[],
+  sent: { side: Side; symbol: string }[],
+): CandidateTrade[] {
+  const going = new Set(sent.map((t) => `${t.side}:${t.symbol}`));
+  return candidates.filter((c) => !going.has(`${c.side}:${c.symbol}`));
+}
+
 /** Decimal places implied by a step/tick size, e.g. 0.001 -> 3. */
 export function precisionOf(step: number): number {
   if (!Number.isFinite(step) || step <= 0) return 8;

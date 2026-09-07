@@ -8,6 +8,7 @@ import {
 } from "../src/core/allocation";
 import {
   DEFAULT_PLAN_CONFIG,
+  declinedTrades,
   deltasFromTrades,
   generateCandidates,
   precisionOf,
@@ -638,5 +639,61 @@ describe("bands follow the market, not a constant", () => {
     // Empty history is not an excuse to invent a multiplier.
     expect(scales.CALM).toBe(1);
     expect(scales.LOUD).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// What the agent chose not to do
+// ---------------------------------------------------------------------------
+
+describe("declined trades", () => {
+  const leg = (side: "BUY" | "SELL", symbol: string, id: string) =>
+    ({
+      id,
+      side,
+      symbol,
+      pair: `${symbol}USDT`,
+      qty: 1,
+      estNotionalUsd: 1000,
+      estFeeUsd: 1,
+      estSlippageUsd: 0.5,
+      estExecPrice: 1000,
+      midPrice: 1000,
+      slippageBps: 5,
+      sequenceIndex: 0,
+    }) as ReturnType<typeof generateCandidates>["candidates"][number];
+
+  const candidates = [leg("SELL", "AVAX", "t1"), leg("BUY", "BTC", "t2"), leg("BUY", "ETH", "t3")];
+
+  it("reports every candidate when nothing is sent — the HOLD case", () => {
+    // This is the product's whole claim: a threshold rule fires these three,
+    // and the agent returns them as declined rather than as prose.
+    expect(declinedTrades(candidates, []).map((c) => c.symbol)).toEqual(["AVAX", "BTC", "ETH"]);
+  });
+
+  it("reports nothing when every candidate is sent", () => {
+    expect(declinedTrades(candidates, candidates)).toEqual([]);
+  });
+
+  it("reports the legs a PARTIAL left out", () => {
+    const sent = [{ side: "BUY" as const, symbol: "BTC" }, { side: "BUY" as const, symbol: "ETH" }];
+    expect(declinedTrades(candidates, sent).map((c) => c.symbol)).toEqual(["AVAX"]);
+  });
+
+  it("matches on side as well as symbol", () => {
+    // A BUY of AVAX going out does not mean the SELL of AVAX was sent.
+    const sent = [{ side: "BUY" as const, symbol: "AVAX" }];
+    expect(declinedTrades(candidates, sent).map((c) => `${c.side} ${c.symbol}`)).toEqual([
+      "SELL AVAX",
+      "BUY BTC",
+      "BUY ETH",
+    ]);
+  });
+
+  it("does not depend on candidate ids", () => {
+    // A PARTIAL regenerates its candidate set, so the ids of the dropped legs
+    // exist nowhere to compare against. Matching by id reported nothing declined.
+    const regenerated = [leg("BUY", "BTC", "t1"), leg("BUY", "ETH", "t2")];
+    expect(declinedTrades(candidates, regenerated).map((c) => c.symbol)).toEqual(["AVAX"]);
   });
 });

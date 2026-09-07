@@ -27,18 +27,65 @@ export function computeNav(holdings: Holding[]): number {
   return holdings.reduce((sum, h) => sum + h.valueUsd, 0);
 }
 
-/** Build Holding rows from raw quantities and a price map. Cash prices at 1.0. */
+/**
+ * A price we do not have.
+ *
+ * This exists because the alternative was worse than an error. A missing price
+ * used to fall back to zero, which is not a missing price — it is a confident
+ * claim that the asset is worthless. Downstream everything believed it: the
+ * position showed 0.0% weight, its full target weight showed as drift, and half
+ * a headline drift figure on the deployed site was two assets the active data
+ * source had never heard of. The narrative then talked about buying them while
+ * the plan could not trade them, because a zero price produces no candidate.
+ *
+ * Nothing about that is recoverable by guessing. Stop instead.
+ */
+export class MissingPriceError extends Error {
+  constructor(readonly symbols: string[]) {
+    super(
+      `No price for ${symbols.join(", ")}. ` +
+        `The active data source does not cover ${symbols.length === 1 ? "it" : "them"}.`,
+    );
+    this.name = "MissingPriceError";
+  }
+}
+
+/** Symbols that need a price and do not have a usable one. Cash never does. */
+export function unpricedSymbols(
+  symbols: string[],
+  prices: Record<string, number>,
+  cashSymbol: string,
+): string[] {
+  return symbols.filter((s) => {
+    if (s === cashSymbol) return false;
+    const p = prices[s];
+    return !Number.isFinite(p) || p <= 0;
+  });
+}
+
+/**
+ * Build Holding rows from raw quantities and a price map. Cash prices at 1.0.
+ *
+ * Throws rather than pricing anything at zero — see MissingPriceError.
+ */
 export function buildHoldings(
   quantities: Record<string, number>,
   prices: Record<string, number>,
   cashSymbol: string,
 ): Holding[] {
-  return Object.entries(quantities)
-    .filter(([, qty]) => qty > 0)
-    .map(([symbol, qty]) => {
-      const priceUsd = symbol === cashSymbol ? 1 : (prices[symbol] ?? 0);
-      return { symbol, qty, priceUsd, valueUsd: qty * priceUsd };
-    });
+  const held = Object.entries(quantities).filter(([, qty]) => qty > 0);
+
+  const unpriced = unpricedSymbols(
+    held.map(([symbol]) => symbol),
+    prices,
+    cashSymbol,
+  );
+  if (unpriced.length > 0) throw new MissingPriceError(unpriced);
+
+  return held.map(([symbol, qty]) => {
+    const priceUsd = symbol === cashSymbol ? 1 : prices[symbol];
+    return { symbol, qty, priceUsd, valueUsd: qty * priceUsd };
+  });
 }
 
 /**
