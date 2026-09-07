@@ -21,3 +21,5 @@ data/replay-journal.json
 
 # Generated for sharing with another model: npm run bundle
 bundle/
+
+.env*

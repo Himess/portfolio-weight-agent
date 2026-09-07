@@ -273,7 +273,18 @@ export default function Page() {
       <header style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
-            <h1 style={{ fontSize: 21, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
+            <h1
+              style={{
+                fontSize: 21,
+                fontWeight: 800,
+                margin: 0,
+                letterSpacing: "-0.02em",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <Mark />
               Portfolio Weight Agent
             </h1>
             <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "6px 0 0", maxWidth: "62ch", lineHeight: 1.5 }}>
@@ -446,6 +457,37 @@ function explain(payload: ApiError): string {
     default:
       return text;
   }
+}
+
+/**
+ * The mark: one position outside its band.
+ *
+ * The same figure the app draws below — target on the outside, where you
+ * actually are on the inside — reduced to the moment the two stop agreeing.
+ * Three positions sit on the ring, one is pushed past it.
+ *
+ * Inline rather than an <img> so it stays sharp at any size, costs no request,
+ * and takes its colours from the theme.
+ */
+function Mark() {
+  return (
+    <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <circle cx="50" cy="50" r="50" fill="var(--ink)" />
+      {/* the tolerance band, drawn as the faint circle everything is judged against */}
+      <circle cx="50" cy="50" r="40.75" fill="none" stroke="var(--ink-3)" strokeWidth="1.2" />
+      <g fill="none" stroke="var(--surface-3)" strokeWidth="10.5">
+        <path d="M 37.83 80.13 A 32.5 32.5 0 0 1 17.82 45.48" />
+        <path d="M 21.04 35.25 A 32.5 32.5 0 0 1 57.31 18.33" />
+        <path d="M 67.22 22.44 A 32.5 32.5 0 0 1 80.91 60.04" />
+      </g>
+      <path
+        d="M 83.14 74.98 A 41.5 41.5 0 0 1 47.83 91.44"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth="12"
+      />
+    </svg>
+  );
 }
 
 function Dot({ on }: { on: boolean }) {
