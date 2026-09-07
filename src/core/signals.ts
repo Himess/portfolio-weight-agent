@@ -109,9 +109,9 @@ export function computeSignals(symbol: string, hourly: Kline[]): AssetSignals {
  *
  * Three things to read off it, in order of how much they should be trusted:
  *
- *   1. Moving from 1.3 to 1.5 improves mean, median and win rate in BOTH
- *      windows. That is the only change both datasets agree on, so it is the
- *      only one made. 1.3 was firing on bars where waiting did not pay.
+ *   1. Every step up to 1.5 improves mean, median and win rate in BOTH windows.
+ *      That is where the agreement ends, so that is where the change stops.
+ *      1.3 was firing on bars where waiting did not pay.
  *   2. 2.0 looks best on majors and turns NEGATIVE on the volatile basket. It
  *      is not adopted. Taking the majors column alone would have been fitting
  *      the constant to one dataset.

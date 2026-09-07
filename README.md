@@ -577,9 +577,10 @@ npm run knife -- --data data/window-volatile.json      # the out-of-sample check
 Both windows are regenerated from Binance, not shipped — they are large and
 the fetch is the point. Neither sweep calls a model.
 
-**Only one row moves the right way in both windows, so only one change was
-made: 1.3 → 1.5.** The move threshold stays at 3%; it beats 2% in both windows,
-and 5% scores better but fires on 0.4–0.8% of bars, too rare to rely on.
+**Every step up to 1.5 improves mean, median and win rate in both windows; the
+step past it does not.** So the change is 1.3 → 1.5, and it stops there. The move
+threshold stays at 3%: it beats 2% in both windows, and 5% scores better but
+fires on 0.4–0.8% of bars, too rare to rely on.
 
 The interesting part is the row below it. On majors, `volRatio ≥ 2.0` is the
 best cell in the table by a wide margin. On the volatile basket the mean goes
