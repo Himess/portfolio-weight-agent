@@ -59,7 +59,7 @@ export const AllocationSchema = z.object({
   cashSymbol: Symbol_,
 });
 
-export const PreferenceSchema = z.enum(["patient", "balanced", "tight"]);
+export const PreferenceSchema = z.enum(["patient", "balanced", "tight", "continuous"]);
 
 export const ReviewRequestSchema = z
   .object({
@@ -67,6 +67,10 @@ export const ReviewRequestSchema = z
     quantities: z.record(Symbol_, z.number().finite().nonnegative()).optional(),
     preference: PreferenceSchema.default("balanced"),
     daysSinceLastRebalance: z.number().finite().nonnegative().nullable().default(null),
+    // Proposals already shown to this owner in the last 24h. Client-supplied
+    // because the decision log lives in their browser; clamped because a
+    // caller could otherwise claim a number that suppresses every proposal.
+    askedLast24h: z.coerce.number().int().min(0).max(50).default(0),
     source: z.enum(["public", "replay", "mcp"]).default("public"),
     dataset: z.string().max(200).optional(),
     bar: z.number().int().nonnegative().optional(),
@@ -117,6 +121,39 @@ export const SparksQuerySchema = z.object({
         .slice(0, 14),
     ),
 });
+
+export const CommandRequestSchema = z.object({
+  // Long enough for a real instruction, short enough that the box is not a
+  // channel for pasting a prompt at the model.
+  message: z.string().trim().min(1, "Say something.").max(400),
+  allocation: AllocationSchema,
+  preference: PreferenceSchema.default("balanced"),
+  hasProposal: z.boolean().default(false),
+});
+
+export type CommandRequest = z.infer<typeof CommandRequestSchema>;
+
+export const WatchRequestSchema = z.object({
+  allocation: AllocationSchema,
+  quantities: z
+    .record(Symbol_, z.number().finite().nonnegative())
+    .refine((q) => Object.keys(q).length > 0, "A watch needs holdings to price."),
+  preference: PreferenceSchema.default("balanced"),
+  label: z.string().trim().max(60).nullable().default(null),
+  // A watch that repeats the same unchanged verdict hourly trains the user to
+  // ignore it. Bounded to a day at the quiet end and an hour at the loud one.
+  repeatAfterHours: z.number().int().min(1).max(168).default(24),
+});
+
+export type WatchRequest = z.infer<typeof WatchRequestSchema>;
+
+/** Watch ids are base64url from randomBytes; anything else is not one of ours. */
+export const WatchIdSchema = z
+  .string()
+  .trim()
+  .min(16)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, "not a watch id");
 
 // ---------------------------------------------------------------------------
 // The wire and the domain must not drift apart

@@ -198,13 +198,27 @@ export type RebalanceContext = {
   daysSinceLastRebalance: number | null;
   preference: Preference;
   cashSymbol: string;
+  /**
+   * How many proposals have already been put in front of this owner in the last
+   * 24 hours. Every one of them costs a hand-made approval in Binance, so
+   * attention — not money — is the scarce resource, and the agent is told what
+   * it has already spent.
+   */
+  askedLast24h?: number;
 };
 
-export type Preference = "patient" | "balanced" | "tight";
+export type Preference = "patient" | "balanced" | "tight" | "continuous";
 
 export type BandConfig = {
   absoluteFloorPp: number;
   relativeBandPct: number;
+  /**
+   * Ceiling in percentage points. Without one, a relative band on a
+   * concentrated position is enormous — 25% of a 50% target is ±12.5pp, so BTC
+   * has to reach 62.5% of the portfolio before anything is said. Optional so a
+   * config written before this existed still means what it meant.
+   */
+  absoluteCapPp?: number;
 };
 
 export type PlanConfig = {
@@ -225,7 +239,9 @@ export type PrimaryFactor =
   | "volatility"
   | "falling_knife"
   | "drift_magnitude"
-  | "staleness";
+  | "staleness"
+  /** Held back because the owner has already been asked enough today. */
+  | "attention";
 
 export type TimingDecision = {
   action: TimingAction;

@@ -12,6 +12,7 @@
 import { isMoveInProgress } from "../core/signals";
 import type { RebalanceContext, TimingDecision } from "../types";
 import { logDecision } from "./client";
+import { askBudgetFor } from "../core/bands";
 import { providerAvailable, structuredCall } from "./provider";
 import { TimingSchema } from "./schemas";
 
@@ -44,10 +45,45 @@ Choose REBALANCE or PARTIAL when drift is real, the cost is proportionate, and
 the market is not mid-move. Staleness matters too: a portfolio that has drifted
 for many weeks deserves action even at a mediocre cost.
 
-Respect the user's stated preference:
-- patient  — tolerate more drift, act less often, weight cost heavily.
-- balanced — the default trade-off.
-- tight    — track the target closely, accept higher costs to do it.
+ATTENTION IS THE SCARCE RESOURCE, NOT MONEY.
+
+Correcting drift is cheap here — only the deviation is traded, and a year of
+constant correction costs well under 1% of the portfolio. What is not cheap is
+the owner: every proposal you make has to be approved by hand in Binance. An
+unapproved proposal tracks nothing, and a person who is asked six times a day
+stops reading.
+
+You are given "askedLast24h", "dailyAskBudget" and "asksRemaining". When you
+hold back for this reason, say so with primaryFactor "attention" — it is a real
+reason and it has its own name. The budget is what normal looks like for this
+owner's setting, not a limit you must obey:
+
+- Well under budget: judge the breach on its merits.
+- At or over budget: the bar rises sharply. HOLD unless this breach is clearly
+  worse than the ones they have already approved today — a position that has
+  kept running, a new asset breaking down, a cost that will only grow. "It is
+  outside its band" is not enough on its own once the budget is spent, because
+  everything you showed them earlier was outside its band too.
+- Far over budget on a violently moving day: one message and no proposals is
+  usually the right answer. You looked, and nothing yet deserved their
+  signature.
+
+Exceeding the budget is allowed when the situation genuinely warrants it. Doing
+it out of completeness is not.
+
+Never say any of this out loud, and never mention a budget or a count. Give the
+reason in terms of the portfolio: what moved, what it would cost, why now or why
+not yet.
+
+Respect the user's stated preference. It has already set the band you are
+shown, so it is not asking you to re-decide the threshold — it tells you how
+this owner weighs cost against tracking when the call is close:
+- patient    — tolerate more drift, weight cost heavily.
+- balanced   — the default trade-off.
+- tight      — track the target closely, accept higher costs to do it.
+- continuous — track almost exactly. Small, frequent corrections are expected
+               and wanted; only real hazards (a move still running, unusable
+               depth) justify waiting.
 
 assetsToActOn must be a subset of the "outsideBand" list you are given, exactly
 as spelled there. For HOLD it must be empty.
@@ -142,7 +178,12 @@ export async function decideTiming(ctx: RebalanceContext): Promise<TimingDecisio
       schemaName: "timing_decision",
       system: SYSTEM,
       facts,
-      temperature: 0.2,
+      // A decision, not prose. The same fact sheet must produce the same
+      // verdict: a rebalancing call that flips between HOLD and PARTIAL on
+      // re-runs of identical input is not auditable, and this one was
+      // observed doing exactly that at 0.2. Variety belongs in the
+      // narrative, which stays warm.
+      temperature: 0,
       maxTokens: 2000,
     });
 
@@ -200,6 +241,9 @@ function buildFacts(ctx: RebalanceContext, outsideBand: string[]) {
   return {
     asOf: ctx.asOf,
     preference: ctx.preference,
+    askedLast24h: ctx.askedLast24h ?? 0,
+    dailyAskBudget: askBudgetFor(ctx.preference),
+    asksRemaining: Math.max(0, askBudgetFor(ctx.preference) - (ctx.askedLast24h ?? 0)),
     navUsd: round(ctx.portfolio.navUsd, 2),
     totalDriftPp: round(ctx.portfolio.totalDriftPp, 3),
     daysSinceLastRebalance: ctx.daysSinceLastRebalance,

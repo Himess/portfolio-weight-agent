@@ -110,6 +110,18 @@ export function daysSinceLastRebalance(now = Date.now()): number | null {
   return Math.floor(ms / 86_400_000);
 }
 
+/**
+ * Proposals shown in the last 24 hours.
+ *
+ * Not "rebalances" — a HOLD still cost the owner a look. This is the count of
+ * times the agent asked for attention, which is what the attention budget is
+ * about.
+ */
+export function askedLast24h(now = Date.now()): number {
+  const cutoff = now - 86_400_000;
+  return all().filter((e) => Date.parse(e.at) >= cutoff).length;
+}
+
 export function clear(): void {
   if (typeof window === "undefined") return;
   try {

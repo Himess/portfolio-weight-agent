@@ -101,7 +101,8 @@ export async function decideExecution(
       schemaName: "execution_decision",
       system: SYSTEM,
       facts,
-      temperature: 0.2,
+      // A decision, not prose — identical facts must give an identical answer.
+      temperature: 0,
       maxTokens: 2000,
     });
 

@@ -161,6 +161,22 @@ export type CallOptions<T> = {
   maxTokens?: number;
 };
 
+/*
+ * There is deliberately no `seed` option.
+ *
+ * It was added to make the decision calls reproducible and removed the same
+ * hour: Gemini's endpoint rejects the field outright with
+ * `Unknown name "seed": Cannot find field`, so every timing and execution call
+ * 400'd and fell back to the deterministic default — a silent downgrade of the
+ * judgment layer in exchange for a parameter the default provider does not
+ * implement. "Harmless if ignored" was the wrong assumption; unknown fields are
+ * not always ignored.
+ *
+ * Decisions run at temperature 0, which is as close to repeatable as this
+ * provider offers, and the docs say plainly that a marginal verdict is not
+ * reproducible. The arithmetic is, and that is the part that matters.
+ */
+
 export async function structuredCall<T>(opts: CallOptions<T>): Promise<CallResult<T>> {
   const provider = resolveProvider();
   if (provider.kind === "none") {

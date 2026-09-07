@@ -27,7 +27,7 @@ type Stored = {
   preference: Preference;
 };
 
-const PREFERENCES: Preference[] = ["patient", "balanced", "tight"];
+const PREFERENCES: Preference[] = ["patient", "balanced", "tight", "continuous"];
 
 export function save(allocation: Allocation, preference: Preference): void {
   if (typeof window === "undefined") return;

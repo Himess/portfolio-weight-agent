@@ -89,7 +89,8 @@ export async function resolveBasket(input: BasketInput): Promise<BasketResolutio
       schemaName: "basket_resolution",
       system: SYSTEM,
       facts,
-      temperature: 0.2,
+      // A decision, not prose — identical facts must give an identical answer.
+      temperature: 0,
       maxTokens: 3000,
     });
 

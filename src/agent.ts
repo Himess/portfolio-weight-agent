@@ -14,6 +14,7 @@
 
 import type { MarketAdapter } from "./adapters/types";
 import { allocationSymbols } from "./core/allocation";
+import { bandsFor, volScales } from "./core/bands";
 import { DEFAULT_PLAN_CONFIG, generateCandidates } from "./core/candidates";
 import { computeCostBenefit } from "./core/costbenefit";
 import { buildHoldings, computeDrift } from "./core/drift";
@@ -25,6 +26,7 @@ import type {
   Allocation,
   AssetSignals,
   CandidateTrade,
+  Kline,
   OrderBook,
   PlanConfig,
   Preference,
@@ -40,12 +42,21 @@ export type ReviewInput = {
   daysSinceLastRebalance: number | null;
   config?: PlanConfig;
   asOf?: string;
+  /** Proposals already shown to this owner in the last 24h — the attention budget */
+  askedLast24h?: number;
   /** Skip the LLM entirely — used by tests and the deterministic-only mode */
   deterministicOnly?: boolean;
 };
 
+/** Two weeks of hourly closes — a stable volatility read without a large fetch. */
+const VOL_LOOKBACK_BARS = 336;
+
 export async function runReview(input: ReviewInput): Promise<Proposal> {
-  const config = input.config ?? DEFAULT_PLAN_CONFIG;
+  // The tracking preference sets the band. It used to reach only the timing
+  // prompt, which meant a tight tracker and a patient one were shown a
+  // portfolio at the identical moment — the preference could decline what it
+  // was shown but never ask to be shown more.
+  const config = input.config ?? { ...DEFAULT_PLAN_CONFIG, bands: bandsFor(input.preference) };
   const cashSymbol = input.allocation.cashSymbol;
 
   // Every symbol we care about: targets plus anything actually held (an
@@ -57,9 +68,28 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
   const prices = await input.market.getPrices(symbols);
   const holdings = buildHoldings(input.quantities, prices, cashSymbol);
 
+  // Recent history for every symbol, not just the drifting ones — the band has
+  // to be known before we can say which of them are drifting. Two weeks of
+  // hourly closes is enough for a stable volatility estimate and is cached.
+  const history: Record<string, Kline[]> = {};
+  await Promise.all(
+    symbols
+      .filter((s) => s !== cashSymbol)
+      .map(async (symbol) => {
+        try {
+          history[symbol] = await input.market.getKlines(symbol, "1h", VOL_LOOKBACK_BARS);
+        } catch {
+          // No history means no scaling for that symbol, which is the same as
+          // the fixed band. Never a reason to fail the whole review.
+        }
+      }),
+  );
+  const volScale = volScales(history);
+
   const portfolio = computeDrift(holdings, input.allocation, {
     bands: config.bands,
     asOf: input.asOf,
+    volScale,
   });
 
   // Only fetch depth and history for what is actually drifting — the rest
@@ -103,6 +133,7 @@ export async function runReview(input: ReviewInput): Promise<Proposal> {
     daysSinceLastRebalance: input.daysSinceLastRebalance,
     preference: input.preference,
     cashSymbol,
+    askedLast24h: input.askedLast24h,
   };
 
   // ---- Decision 1: timing -------------------------------------------------

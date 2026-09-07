@@ -18,10 +18,12 @@ import type {
   PortfolioState,
   Side,
 } from "../types";
+import { BANDS } from "./bands";
 import { midPrice, walkBookByQty } from "./slippage";
 
 export const DEFAULT_PLAN_CONFIG: PlanConfig = {
-  bands: { absoluteFloorPp: 2.0, relativeBandPct: 0.25 },
+  // The balanced rung of the ladder, not a second copy of it.
+  bands: BANDS.balanced,
   minTradeUsd: 10,
   feeRate: 0.001, // 10 bps taker, Binance spot default tier
 };
