@@ -664,20 +664,23 @@ Full output in `docs/backtest.json`.
 ## Architecture
 
 ```
-src/core/       pure functions — drift, bands, candidates, slippage, signals, cost/benefit
+src/core/       pure functions — drift, bands, candidates, slippage, signals, funding, cost/benefit
 src/adapters/   PublicAdapter (no auth) · ReplayAdapter (historical) · McpAdapter (OAuth)
-src/llm/        four decisions, each with a strict schema, a validator, and a deterministic fallback
-src/agent.ts    the loop: drift → candidates → cost/benefit → timing → execution → narrative
-src/app/        four screens
-scripts/        klines capture · replay harness · MCP tool discovery
-tests/          48 tests, no API key required
+src/llm/        six model-facing calls, each with a strict schema, a validator, and a
+                deterministic fallback: timing · execution · narrative · basket · command · explain
+src/agent.ts    the loop: drift → candidates → cost/benefit → timing → execution → funding → narrative
+src/app/        four screens, plus the HTTP routes behind them
+src/server/     session, rate limits, error shaping, the watch runner, Telegram
+src/mcp/        the same agent as an MCP server — stdio and streamable HTTP
+scripts/        klines capture · replay · band sweep · knife sweep · backtest · decision log
+tests/          246 tests, no API key required
 ```
 
 Everything talks to one adapter interface with three implementations, so the replay harness, the
 public-data path and the live MCP path exercise identical logic.
 
 ```bash
-npm test        # 48 tests
+npm test        # 246 tests, no network, no key
 npm run typecheck
 npm run build
 ```
