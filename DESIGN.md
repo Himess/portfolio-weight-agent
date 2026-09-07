@@ -418,8 +418,8 @@ any attempt to bypass the confirmation gate.
 ## 14. README requirements
 
 - The one-line thesis, up top.
-- Which Agent OS pieces are used and why: MCP market data (public), account read, spot trade,
-  optionally the read-only main-account view.
+- Which Agent OS pieces are used and why — and, for each unused one, the measured reason. Every
+  row is a working integration or a decision, never a blank.
 - **The agent/bot distinction, stated plainly:** deterministic math, non-deterministic judgment. Say
   what the LLM decides and what it is structurally prevented from deciding.
 - `docs/mcp-tools.json` — the observed tool list, offered as a contribution since it isn't published.

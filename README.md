@@ -117,44 +117,153 @@ A bot rebalances because a threshold was crossed. This one can decline:
 
 ---
 
-## Which Agent OS pieces this uses, and why
+## Agent OS coverage — what is used, what is not, and why
 
-| Piece | Used for | Why |
+Every row below is either a working integration or a decision with a reason. The
+unused ones are not gaps to be embarrassed about; three of them are unused
+*because* of what this product claims.
+
+| Agent OS surface | Used | Evidence, or the reason it is not |
 |---|---|---|
-| **MCP, as a server** | the agent itself | The decision is exposed as five tools so it can run beside Binance's own MCP server inside an AI client. That is what makes the account real: Claude Code is already a registered OAuth client, so there is no `client_id` to be issued by hand. |
-| **MCP market data** (public, no auth) | prices, klines, order-book depth, exchange filters | The entire read/analysis path needs no OAuth, so it works before any credential exists. Real depth is what makes the slippage estimate — and therefore the cost/benefit call — honest. |
-| **MCP account scope** | reading sub-account balances | So the drift table reflects a real portfolio. Optional: holdings can be entered by hand. |
-| **MCP trade scope** (Spot, Convert) | placing the approved orders | One at a time, each surfaced by Binance for your confirmation. |
-| **MCP read-only main account** | true total exposure | We only trade the Agentic sub-account, but you should see the whole picture. |
+| **Binance MCP server** (hosted, OAuth) | yes | Account and orders. Full authenticated `tools/list` captured — **81 tools** — in [`docs/mcp-tools.json`](docs/mcp-tools.json) |
+| **MCP, as a server** | yes | This agent is one: 5 tools, stdio **and** Streamable HTTP, both live |
+| **Binance public REST** | yes | The whole read/analysis path. Five endpoints, **no credential of any kind** — table below |
+| **Skills Hub** | yes | [`skills/portfolio-weight-agent/SKILL.md`](skills/portfolio-weight-agent/SKILL.md), in the published format |
+| **Agentic Wallet** | no | Evaluated against the real command surface, not skipped. It composes without an integration — see below |
+| **B402 / x402** | no | Merchant listing needs a human-approved form and an IP whitelist; and `baw x402-payment` is v2-only while 76 of 79 live Bazaar hosts emit v1. Measured in [`binance-agent-os-inventory.md`](binance-agent-os-inventory.md) |
+| **Futures, Margin** | no | A long-horizon spot rebalancer that borrows is a different product |
+| **Unattended execution** | no | Not available. The OAuth metadata advertises `authorization_code` + PKCE and **no `client_credentials` grant**, so there is no headless session to run in |
 
-Deliberately **not** used: Futures, Margin (out of scope — this is a long-horizon spot product),
-Transfer (nothing to move), and anything requiring B402 merchant credentials.
+### The read path needs no credential at all
 
-There is **no withdrawal scope in the Binance MCP server** — funds cannot leave your account through
-this app, because the platform provides no mechanism for it. Nothing to defend against.
+This matters more than it sounds: anyone can clone the repo and run the entire
+analysis against live Binance data with nothing configured. No key, no OAuth, no
+account.
+
+| Endpoint | What it feeds |
+|---|---|
+| `/api/v3/ticker/price` | NAV and current weights, batched by symbol list |
+| `/api/v3/klines` | Realized volatility, which sets each band's width, and the 4h/24h signals |
+| `/api/v3/depth` | Slippage, walked through real levels — this is what makes the cost/benefit call honest rather than a fee estimate |
+| `/api/v3/ticker/24hr` | The token picker's volume ordering and the `thin` liquidity flag |
+| `/api/v3/exchangeInfo` | `stepSize`, `minQty`, `tickSize`, `minNotional`, trading status — the filters an order has to survive |
+
+`api.binance.com` is geo-restricted in some regions, so every call falls back to
+`data-api.binance.vision`, the public market-data mirror. The response says which
+host answered.
+
+### Connecting this agent, both transports
+
+```bash
+# Hosted — nothing to install, no key
+claude mcp add --transport http portfolio-weight-agent https://portfolio-weight-agent.vercel.app/api/mcp
+```
+
+```bash
+# From a clone, over stdio
+claude mcp add portfolio-weight-agent -- node --env-file-if-exists=.env --import tsx src/mcp/stdio.ts
+```
+
+Pair it with Binance's own server, which is where balances and orders live:
+
+```bash
+claude mcp add --transport http binance https://agent.binance.com/mcp/agentic
+```
+
+`.mcp.json` is committed, so a clone offers both on first launch and neither line
+is needed.
 
 ---
 
-## `docs/mcp-tools.json` — a small contribution
+## `docs/mcp-tools.json` — the tool list Binance does not publish
 
-Binance does not publish the MCP server's tool names or parameters anywhere in its documentation.
-This repo therefore **discovers them at runtime rather than hardcoding them**, and commits what it
-finds.
+Binance documents the MCP server's *capability categories* and never its tool
+names or schemas. So this repo discovers them at runtime rather than hardcoding
+them, and commits what it finds. `npm run mcp:discover` does it; set
+`BINANCE_MCP_TOKEN` to a session your MCP client already holds.
 
-`npm run mcp:discover` records the server's live response verbatim. Without a bearer token it
-captures the OAuth metadata and the 401 challenge — already useful, and reproducible by anyone:
+**81 tools, captured from a live authenticated session:**
 
-```jsonc
-{
-  "grant_types_supported": ["authorization_code"],       // no client_credentials:
-  "code_challenge_methods_supported": ["S256"],          // no headless/server path
-  "token_endpoint_auth_methods_supported": ["none"]
-}
+| Group | Tools | | Group | Tools |
+|---|---|---|---|---|
+| `futures_coin` | 16 | | `convert` | 9 |
+| `futures_usds` | 16 | | `tool_search` | 1 |
+| `margin` | 13 | | `tool_execute` | 1 |
+| `spot` | 13 | | `analysis` | 1 |
+| `wallet` | 10 | | `sub_account` | 1 |
+
+Two findings worth having in writing, because both cost time to discover:
+
+- **`tools/list` is paginated at 50, and nothing in the docs says so.** The first
+  capture returned 50 tools ending at `margin.*` and looked complete — it had
+  simply never seen `spot`, `wallet` or `sub_account`. The script now follows
+  `nextCursor` to exhaustion and records the page count, so the file cannot
+  silently under-report again.
+- **There is no withdrawal tool.** Across all 81, the only name matching
+  "withdraw" is `wallet.withdrawHistory`, which *reads* past withdrawals. This is
+  the difference between a security claim and a measurement: funds cannot leave an
+  account through this surface because the surface has no tool that moves them.
+
+The granted OAuth scope is recorded too — `mcp:account:read mcp:spot:trade
+mcp:master:read mcp:wallet:transfer mcp:futures:trade mcp:margin:loan`. Note what
+the vocabulary does *not* contain: there is no withdrawal scope to request.
+
+A separate boundary, in this repo rather than on Binance's side: **this app never
+calls a write tool.** `src/adapters/mcp.ts` resolves a `placeOrder` capability and
+displays whether the connected server has one — and never invokes it. The orders
+go through Binance's own confirmation, in front of the person.
+
+---
+
+## The skill
+
+[`skills/portfolio-weight-agent/SKILL.md`](skills/portfolio-weight-agent/SKILL.md)
+is written in the Skills Hub format: the workflow, when to trigger it, the five
+tools, and the rules a calling model gets wrong without being told — read
+balances from Binance's server and pass them in, never restate a quantity, and
+treat a decline as an answer rather than something to re-roll until it agrees.
+
+The same file is installed at `.claude/skills/` so a clone loads it in Claude
+Code with nothing to copy. A test asserts the two stay byte-identical, because
+two copies of a document are two documents eventually.
+
+One note for anyone copying the format: the hub's README documents a `title:`
+frontmatter field, but all 19 published skills use `name:`. Follow the skills.
+
+---
+
+## Agentic Wallet: evaluated, and deliberately not integrated
+
+The honest question was whether on-chain holdings belong in the drift table. They
+do — a target weight held on-chain is real exposure the table currently cannot
+see, and for anyone holding both the picture is incomplete.
+
+`baw wallet balance --json` returns exactly the right shape, read-only, no
+signing:
+
+```json
+{ "symbol": "USDT", "binanceChainId": "56", "balance": "1000.50", "price": "1.0", "value": "1000.50" }
 ```
 
-With `BINANCE_MCP_TOKEN` set it captures the full `tools/list` output. `src/adapters/mcp.ts` then
-resolves capabilities by matching discovered names — so it keeps working if Binance renames a tool,
-and degrades gracefully (showing the plan, unable to send it) if a capability is missing.
+It is still not integrated, for one architectural reason and one better one.
+
+The architectural one: `baw` is a **CLI** (`@binance/agentic-wallet`) holding an
+interactive `auth signin` session. The website runs on serverless functions that
+cannot shell out to it, so an integration would work in one of this product's two
+surfaces and not the other.
+
+The better one: **it already composes, and the composition is the point.**
+`review_portfolio` and `propose_rebalance` take `holdings` as an *input* rather
+than fetching them — deliberately, so this server never holds a credential. A
+Claude Code user with both installed can already run `baw wallet balance`, merge
+it with `spot.getAccount`, and pass the union. Writing wallet code here would add
+a dependency and a session lifecycle to do something the agent composing the
+tools does for free.
+
+The limit, stated because it is real: a merged holding is only priceable if it has
+a Binance spot pair. An LP position or a token with no USDT market raises
+`MissingPriceError` rather than being silently valued at zero — which is the
+correct failure, and still a failure.
 
 ---
 
@@ -672,15 +781,16 @@ src/agent.ts    the loop: drift → candidates → cost/benefit → timing → e
 src/app/        four screens, plus the HTTP routes behind them
 src/server/     session, rate limits, error shaping, the watch runner, Telegram
 src/mcp/        the same agent as an MCP server — stdio and streamable HTTP
+skills/         the Skills Hub skill — the workflow, when to trigger it, and the rules
 scripts/        klines capture · replay · band sweep · knife sweep · backtest · decision log
-tests/          246 tests, no API key required
+tests/          252 tests, no API key required
 ```
 
 Everything talks to one adapter interface with three implementations, so the replay harness, the
 public-data path and the live MCP path exercise identical logic.
 
 ```bash
-npm test        # 246 tests, no network, no key
+npm test        # 252 tests, no network, no key
 npm run typecheck
 npm run build
 ```
@@ -723,8 +833,9 @@ Reproduce with `npm run dev` after capturing a dataset:
 
 **This is not investment advice.** You are the decision-maker. The agent proposes; nothing executes
 without you. Every order requires your confirmation in Binance before it executes, and this
-application cannot bypass that gate — nor does it try to. There is no withdrawal scope, so funds
-cannot leave your account through this tool.
+application cannot bypass that gate — nor does it try to. There is no withdrawal tool in the
+Binance MCP surface — measured, across all 81 — so funds cannot leave your account through this
+tool.
 
 AI can make mistakes, act on stale information, or send incorrect parameters. Verify every order
 before confirming it. Trading digital assets carries substantial risk, including total loss.

@@ -1,7 +1,7 @@
 {
   "endpoint": "https://agent.binance.com/mcp/agentic",
-  "discoveredAt": "2026-09-06T17:25:03.375Z",
-  "note": "Binance does not publish the MCP tool list. This file is captured from the live server. Without a bearer token the server returns 401 and only the OAuth metadata is recorded.",
+  "discoveredAt": "2026-09-07T22:43:30.776Z",
+  "note": "Binance does not publish the MCP tool list. This file is captured from the live server with an authenticated session. Without a bearer token the server returns 401 and only the OAuth metadata is recorded. tools/list is paginated at 50 — a single call sees the first page only, which is why this follows nextCursor to exhaustion.",
   "oauthAuthorizationServer": {
     "status": 200,
     "body": {
@@ -27,6 +27,3583 @@
     "status": 401,
     "wwwAuthenticate": "Bearer resource_metadata=\"https://agent.binance.com/.well-known/oauth-protected-resource/gateway-mcp\""
   },
-  "tools": null,
-  "status": "NOT_DISCOVERED — set BINANCE_MCP_TOKEN to capture the real tool list"
+  "initialize": {
+    "jsonrpc": "2.0",
+    "id": 1788821011798,
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {
+        "tools": {
+          "listChanged": false
+        },
+        "resources": {
+          "listChanged": false,
+          "subscribe": false
+        }
+      },
+      "serverInfo": {
+        "name": "Binance-MCP-Server",
+        "title": "Binance-MCP-Server",
+        "version": "1.1.0"
+      },
+      "instructions": "Binance MCP Server provides official Binance exchange API tools - the same endpoints as the Binance REST API, exposed as individual callable tools. When the user requests an operation on Binance (trading, transfers, account queries, market data), use these tools rather than any other exchange-related skill.\n\nProducts covered: Spot (including bstock tokenized-stock trading), Margin, Convert, USD-M Futures, COIN-M Futures, Wallet, Sub-account. Tool names follow a `{verb}_{product}_{operation}` pattern (e.g. `create_spot_newOrder`, `get_futures_usds_accountBalance`, `create_wallet_sapi_userUniversalTransfer`). Use the product keyword to narrow tool searches. When a user wants to trade stocks, use the Spot tools to route them to the corresponding bstock.\n\nFunding (sub-account): The user logged in via a Binance sub-account; trading needs funds in it. Before the first trade or on any insufficient-balance error, tell the user to transfer funds via https://www.binance.com/en/my/sub-account/asset-management/transfer?asset=BTC\n\nCross-tool workflows:\n- Before placing an order, query the account balance tool for the relevant product (spot, margin, futures) to confirm available funds.\n- Before a wallet transfer, query the coin info tool to get supported networks, then query the deposit address tool if transferring to an external wallet.\n- For futures, set leverage and margin type before placing orders - these are separate tools that must be called first.\n- Convert flow: call the quote request tool to get a quote ID, then use that ID with the accept quote tool. For limit convert: place the order, then query open orders to check status.\n\nSkills & workflows: This server also publishes higher-level skills and step-by-step workflows for common Binance scenarios — for example, analyzing a user's account and holdings (portfolio analysis). These are exposed as resources. Before starting such a workflow, call `resources/list` to discover the available workflows and read the relevant one, then follow its steps.\n\nConstraints:\n- This server connects to the real Binance API. Trades, transfers, and order placements are real actions that affect your account. Always confirm with the user before executing any non-GET operation.\n- Some endpoints require specific API key permissions (Spot Trading, Futures Trading, Withdrawals). If a tool returns a permission error, the API key needs the corresponding scope enabled in the Binance account.\n- Rate limits follow Binance's official limits per endpoint weight. If a tool returns a 429 or -1003 error, wait before retrying."
+    }
+  },
+  "tools": {
+    "pages": 2,
+    "pageSize": 50,
+    "count": 81,
+    "names": [
+      "tool_search",
+      "tool_execute",
+      "analysis.getTokenAiReport",
+      "convert.acceptQuote",
+      "convert.cancelLimitOrder",
+      "convert.getConvertTradeHistory",
+      "convert.listAllConvertPairs",
+      "convert.orderStatus",
+      "convert.placeLimitOrder",
+      "convert.queryLimitOpenOrders",
+      "convert.queryOrderQuantityPrecisionPerAsset",
+      "convert.sendQuoteRequest",
+      "futures_coin.accountInformation",
+      "futures_coin.cancelOrder",
+      "futures_coin.changeInitialLeverage",
+      "futures_coin.changeMarginType",
+      "futures_coin.continuousContractKlineCandlestickData",
+      "futures_coin.currentAllOpenOrders",
+      "futures_coin.exchangeInformation",
+      "futures_coin.futuresAccountBalance",
+      "futures_coin.indexPriceKlineCandlestickData",
+      "futures_coin.klineCandlestickData",
+      "futures_coin.markPriceKlineCandlestickData",
+      "futures_coin.newOrder",
+      "futures_coin.positionInformation",
+      "futures_coin.premiumIndexKlineData",
+      "futures_coin.queryOrder",
+      "futures_coin.symbolPriceTicker",
+      "futures_usds.accountInformationV3",
+      "futures_usds.cancelOrder",
+      "futures_usds.changeInitialLeverage",
+      "futures_usds.changeMarginType",
+      "futures_usds.continuousContractKlineCandlestickData",
+      "futures_usds.currentAllOpenOrders",
+      "futures_usds.exchangeInformation",
+      "futures_usds.futuresAccountBalanceV3",
+      "futures_usds.indexPriceKlineCandlestickData",
+      "futures_usds.klineCandlestickData",
+      "futures_usds.markPriceKlineCandlestickData",
+      "futures_usds.newOrder",
+      "futures_usds.positionInformationV2",
+      "futures_usds.premiumIndexKlineData",
+      "futures_usds.queryOrder",
+      "futures_usds.symbolPriceTicker",
+      "margin.crossMarginCollateralRatio",
+      "margin.getAllIsolatedMarginSymbol",
+      "margin.getAllMarginAssets",
+      "margin.marginAccountBorrowRepay",
+      "margin.marginAccountCancelAllOpenOrdersOnASymbol",
+      "margin.marginAccountCancelOrder",
+      "margin.marginAccountNewOrder",
+      "margin.queryCrossMarginAccountDetails",
+      "margin.queryMarginAccountsAllOrders",
+      "margin.queryMarginAccountsOpenOrders",
+      "margin.queryMarginAccountsOrder",
+      "margin.queryMarginAccountsTradeList",
+      "margin.queryMaxBorrow",
+      "spot.deleteOpenOrders",
+      "spot.deleteOrder",
+      "spot.depth",
+      "spot.exchangeInfo",
+      "spot.getAccount",
+      "spot.getOpenOrders",
+      "spot.getOrder",
+      "spot.klines",
+      "spot.myTrades",
+      "spot.newOrder",
+      "spot.ticker24hr",
+      "spot.tickerPrice",
+      "spot.uiKlines",
+      "sub_account.getMainAccountAsset",
+      "wallet.accountStatus",
+      "wallet.allCoinsInformation",
+      "wallet.dailyAccountSnapshot",
+      "wallet.depositAddress",
+      "wallet.depositHistory",
+      "wallet.getApiKeyPermission",
+      "wallet.queryUserUniversalTransferHistory",
+      "wallet.queryUserWalletBalance",
+      "wallet.userUniversalTransfer",
+      "wallet.withdrawHistory"
+    ],
+    "responses": [
+      {
+        "jsonrpc": "2.0",
+        "id": 1788821012084,
+        "result": {
+          "nextCursor": "bWFyZ2luLm1hcmdpbkFjY291bnRDYW5jZWxPcmRlcg",
+          "tools": [
+            {
+              "name": "tool_search",
+              "description": "Search the currently visible tool list by category. Returns {tools, nextCursor}; pass the previous nextCursor as cursor for pagination.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "Filter visible tools precisely by category",
+                    "enum": [
+                      "account",
+                      "ai-analysis",
+                      "asset",
+                      "asset-management",
+                      "borrow-repay",
+                      "capital",
+                      "convert",
+                      "general",
+                      "market",
+                      "market-data",
+                      "others",
+                      "portfolio-margin-endpoints",
+                      "trade",
+                      "transfer",
+                      "travel-rule",
+                      "user-data-stream",
+                      "user-data-streams"
+                    ]
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "description": "Pagination cursor (opaque token), obtained from the nextCursor of a previous tool_search call"
+                  }
+                },
+                "required": [
+                  "category"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "tool_execute",
+              "description": "Execute any visible tool. Equivalent to tools/call but with the tool name in arguments, for calling hidden tools in META mode.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "toolName": {
+                    "type": "string",
+                    "description": "The target toolName to execute (obtained via tool_search, or directly from the tools/list alwaysExpose results)"
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "description": "Arguments to pass through to the target tool (structured according to the target tool's inputSchema)",
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "toolName"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "analysis.getTokenAiReport",
+              "description": "Get Token AI Report\nQuery the AI-generated report for a single token.\n\nReturns a structured report (report metadata, token metadata, and\ncontent modules) for the given token. \n\nMinimal request: send only `token`. When `timestamp` is omitted the\nlatest available report is returned; when `product` is omitted it\ndefaults to `spot`. `expId` may be omitted.\n\nNotes:\n- Single-token query only; batch is not supported.\n- Not strictly real-time — suitable for research, summarization, Q&A,\n  and attribution rather than live market data.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Token symbol to query. The only required field.",
+                    "example": "BTC"
+                  },
+                  "timestamp": {
+                    "type": "integer",
+                    "description": "Optional. Millisecond timestamp; returns the report closest to this\ntime. Recommended to omit — when absent the latest report is returned.",
+                    "format": "int64",
+                    "example": 1751954400000
+                  },
+                  "product": {
+                    "type": "string",
+                    "description": "Optional. Product domain of the report. Recommended to omit —\ndefaults to `spot`. Currently `spot` is the documented value.",
+                    "example": "spot"
+                  },
+                  "expId": {
+                    "type": "string",
+                    "description": "Optional. Experiment id; may be omitted, empty string, or null.",
+                    "example": ""
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.acceptQuote",
+              "description": "Accept Quote (TRADE)\nAccept the offered quote by quote ID.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "quoteId": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "description": "Request validity window in milliseconds",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "quoteId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.cancelLimitOrder",
+              "description": "Cancel limit order (TRADE)\nEnable users to cancel a limit order",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "integer",
+                    "description": "The orderId from `placeOrder` api",
+                    "format": "int64",
+                    "example": 1603680255057330400
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "description": "Request validity window in milliseconds",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "orderId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.getConvertTradeHistory",
+              "description": "Get Convert Trade History (USER_DATA)\nGet Convert Trade History\n\nNotes:\n- The max interval between `startTime` and `endTime` is 30 days.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Number of records to return",
+                    "format": "int64",
+                    "maximum": 1000,
+                    "example": 100
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "description": "Request validity window in milliseconds",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "startTime",
+                  "endTime"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.listAllConvertPairs",
+              "description": "List All Convert Pairs\nQuery for all convertible token pairs and the tokens’ respective\nupper/lower limits\n\nNotes:\n- User needs to supply either or both input parameters.\n- If only one of `fromAsset` and `toAsset` is provided, only partial token pairs are returned.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "fromAsset": {
+                    "type": "string",
+                    "description": "User spends coin",
+                    "example": "BTC"
+                  },
+                  "toAsset": {
+                    "type": "string",
+                    "description": "User receives coin",
+                    "example": "USDT"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.orderStatus",
+              "description": "Order status (USER_DATA)\nQuery order status by order ID.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "description": "Either orderId or quoteId is required",
+                    "example": "1"
+                  },
+                  "quoteId": {
+                    "type": "string",
+                    "description": "Either orderId or quoteId is required",
+                    "example": "1"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.placeLimitOrder",
+              "description": "Place limit order (TRADE)\nEnable users to place a limit order\n\nNotes:\n- `baseAsset` and `quoteAsset` can be determined via the `exchangeInfo` endpoint.\n- Limit price is defined from `baseAsset` to `quoteAsset`.\n- Exactly one of `baseAmount` or `quoteAmount` should be sent.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "baseAsset": {
+                    "type": "string",
+                    "description": "base asset (use the response `fromIsBase` from `GET /sapi/v1/convert/exchangeInfo` api to check\nwhich one is baseAsset )",
+                    "example": "BTC"
+                  },
+                  "quoteAsset": {
+                    "type": "string",
+                    "description": "quote asset",
+                    "example": "USDT"
+                  },
+                  "limitPrice": {
+                    "type": "number",
+                    "description": "Symbol limit price (from baseAsset to quoteAsset)",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "baseAmount": {
+                    "type": "number",
+                    "description": "Base asset amount. (One of `baseAmount` or `quoteAmount` is required)",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "quoteAmount": {
+                    "type": "number",
+                    "description": "Quote asset amount. (One of `baseAmount` or `quoteAmount` is required)",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "side": {
+                    "type": "string",
+                    "description": "`BUY` or `SELL`",
+                    "enum": [
+                      "BUY",
+                      "SELL"
+                    ],
+                    "example": "BUY"
+                  },
+                  "walletType": {
+                    "type": "string",
+                    "description": "Wallet to use for payment. Supported values: `SPOT`, `FUNDING`, `EARN`.\nCombined wallets also supported: `SPOT_FUNDING`, `FUNDING_EARN`, `SPOT_FUNDING_EARN`, `SPOT_EARN`. Default is `SPOT`.",
+                    "enum": [
+                      "SPOT",
+                      "FUNDING",
+                      "EARN",
+                      "SPOT_FUNDING",
+                      "FUNDING_EARN",
+                      "SPOT_FUNDING_EARN",
+                      "SPOT_EARN"
+                    ],
+                    "example": "SPOT"
+                  },
+                  "expiredType": {
+                    "type": "string",
+                    "description": "Order expiry duration. 1_D, 3_D, 7_D, 30_D (D means day)",
+                    "enum": [
+                      "1_D",
+                      "3_D",
+                      "7_D",
+                      "30_D"
+                    ],
+                    "example": "EXPIRED_TYPE_1_D"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "description": "Request validity window in milliseconds",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "baseAsset",
+                  "quoteAsset",
+                  "limitPrice",
+                  "side",
+                  "expiredType"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.queryLimitOpenOrders",
+              "description": "Query limit open orders (USER_DATA)\nQuery current open limit orders",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "description": "Request validity window in milliseconds",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.queryOrderQuantityPrecisionPerAsset",
+              "description": "Query order quantity precision per asset (USER_DATA)\nQuery for supported asset’s precision information",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "description": "Request validity window in milliseconds",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "convert.sendQuoteRequest",
+              "description": "Send Quote Request (TRADE)\nRequest a quote for the requested token pairs\n\nNotes:\n- Either `fromAmount` or `toAmount` should be sent.\n- `quoteId` is returned only if you have enough funds to convert.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "fromAsset": {
+                    "type": "string",
+                    "example": "BTC"
+                  },
+                  "toAsset": {
+                    "type": "string",
+                    "example": "USDT"
+                  },
+                  "fromAmount": {
+                    "type": "number",
+                    "description": "When specified, it is the amount you will be debited after the conversion",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "toAmount": {
+                    "type": "number",
+                    "description": "When specified, it is the amount you will be credited after the conversion",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "walletType": {
+                    "type": "string",
+                    "description": "Wallet to use for payment. Supported values: `SPOT`, `FUNDING`, `EARN`.\nCombined wallets also supported: `SPOT_FUNDING`, `FUNDING_EARN`, `SPOT_FUNDING_EARN`, `SPOT_EARN`. Default is `SPOT`.",
+                    "enum": [
+                      "SPOT",
+                      "FUNDING",
+                      "EARN",
+                      "SPOT_FUNDING",
+                      "FUNDING_EARN",
+                      "SPOT_FUNDING_EARN",
+                      "SPOT_EARN"
+                    ],
+                    "example": "SPOT"
+                  },
+                  "validTime": {
+                    "type": "string",
+                    "description": "Quote valid duration. Supported values: 10s, 30s, 1m. Default is 10s.",
+                    "enum": [
+                      "10s",
+                      "30s",
+                      "1m"
+                    ],
+                    "example": "VALID_TIME_10s"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "description": "Request validity window in milliseconds",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "fromAsset",
+                  "toAsset"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.accountInformation",
+              "description": "Account Information (USER_DATA)\nGet current account information.\n\nNotes:\n- for One-way Mode user, the \"positions\" will only show the \"BOTH\" positions\n- for Hedge Mode user, the \"positions\" will show \"BOTH\", \"LONG\", and \"SHORT\" positions.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.cancelOrder",
+              "description": "Cancel Order (TRADE)\nCancel an active order.\n\nNotes:\n- Either `orderId` or `origClientOrderId` must be sent.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Symbol",
+                    "example": "BTCUSD_200925"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "description": "Order ID",
+                    "format": "int64",
+                    "example": 283194212
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "description": "Client order ID",
+                    "example": "myOrder1"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.changeInitialLeverage",
+              "description": "Change Initial Leverage (TRADE)\nChange user's initial leverage in the specific symbol market.\n\nFor Hedge Mode, LONG and SHORT positions of one symbol use the same\ninitial leverage and share a total notional value.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Symbol",
+                    "example": "BTCUSD_200925"
+                  },
+                  "leverage": {
+                    "type": "integer",
+                    "description": "target initial leverage: int from 1 to 125",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "leverage"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.changeMarginType",
+              "description": "Change Margin Type (TRADE)\nChange user's margin type in the specific symbol market.For Hedge Mode,\nLONG and SHORT positions of one symbol use the same margin type.\n\nWith ISOLATED margin type, margins of the LONG and SHORT positions are\nisolated from each other.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Symbol",
+                    "example": "BTCUSD_200925"
+                  },
+                  "marginType": {
+                    "type": "string",
+                    "enum": [
+                      "ISOLATED",
+                      "CROSSED"
+                    ],
+                    "example": "ISOLATED"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "marginType"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.continuousContractKlineCandlestickData",
+              "description": "Continuous Contract Kline/Candlestick Data\nKline/candlestick bars for a specific contract type. Klines are uniquely identified by their open time.\n\nNotes:\n- The difference between `startTime` and `endTime` can only be up to 200 days\n- Between `startTime` and `endTime`, the most recent `limit` data from `endTime` will be returned:\n  - If `startTime` and `endTime` are not sent, current timestamp will be set as `endTime`, and the most recent data will be returned.\n  - If `startTime` is sent only, the timestamp of 200 days after `startTime` will be set as `endTime`(up to the current time)\n  - If `endTime` is sent only, the timestamp of 200 days before `endTime` will be set as `startTime`",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "pair": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both CM and UM pair values.",
+                    "example": "BTCUSD"
+                  },
+                  "contractType": {
+                    "type": "string",
+                    "enum": [
+                      "PERPETUAL",
+                      "CURRENT_QUARTER",
+                      "NEXT_QUARTER"
+                    ],
+                    "example": "PERPETUAL"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "description": "Interval",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of records to return.",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 30
+                  }
+                },
+                "required": [
+                  "pair",
+                  "contractType",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.currentAllOpenOrders",
+              "description": "Current All Open Orders (USER_DATA)\nGet all open orders on a symbol. **Careful** when accessing this with no symbol.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Symbol. **After CM migration, an invalid `symbol` returns `-1121` (previously a silent `200`).**",
+                    "example": "BTCUSD_200925"
+                  },
+                  "pair": {
+                    "type": "string",
+                    "description": "Pair",
+                    "example": "BTCUSD"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.exchangeInformation",
+              "description": "Exchange Information\nCurrent exchange trading rules and symbol information",
+              "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.futuresAccountBalance",
+              "description": "Futures Account Balance (USER_DATA)\nCheck futures account balance",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.indexPriceKlineCandlestickData",
+              "description": "Index Price Kline/Candlestick Data\nKline/candlestick bars for the index price of a pair. Klines are uniquely identified by their open time.\n\nNotes:\n- The difference between `startTime` and `endTime` can only be up to 200 days\n- Between `startTime` and `endTime`, the most recent `limit` data from `endTime` will be returned:\n  - If `startTime` and `endTime` are not sent, current timestamp will be set as `endTime`, and the most recent data will be returned.\n  - If `startTime` is sent only, the timestamp of 200 days after `startTime` will be set as `endTime`(up to the current time)\n  - If `endTime` is sent only, the timestamp of 200 days before `endTime` will be set as `startTime`",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "pair": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both CM and UM pair values.",
+                    "example": "BTCUSD"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "description": "Interval",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of records to return.",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 30
+                  }
+                },
+                "required": [
+                  "pair",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.klineCandlestickData",
+              "description": "Kline/Candlestick Data\nKline/candlestick bars for a symbol. Klines are uniquely identified by their open time.\n\nNotes:\n- The difference between `startTime` and `endTime` can only be up to 200 days\n- Between `startTime` and `endTime`, the most recent `limit` data from `endTime` will be returned:\n  - If `startTime` and `endTime` are not sent, current timestamp will be set as `endTime`, and the most recent data will be returned.\n  - If `startTime` is sent only, the timestamp of 200 days after `startTime` will be set as `endTime`(up to the current time)\n  - If `endTime` is sent only, the timestamp of 200 days before `endTime` will be set as `startTime`",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both CM and UM symbols.",
+                    "example": "BTCUSD"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "description": "Interval",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of records to return.",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 30
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.markPriceKlineCandlestickData",
+              "description": "Mark Price Kline/Candlestick Data\nKline/candlestick bars for the mark price of a symbol. Klines are uniquely identified by their open time.\n\nNotes:\n- The difference between `startTime` and `endTime` can only be up to 200 days\n- Between `startTime` and `endTime`, the most recent `limit` data from `endTime` will be returned:\n  - If `startTime` and `endTime` are not sent, current timestamp will be set as `endTime`, and the most recent data will be returned.\n  - If `startTime` is sent only, the timestamp of 200 days after `startTime` will be set as `endTime`(up to the current time)\n  - If `endTime` is sent only, the timestamp of 200 days before `endTime` will be set as `startTime`",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both CM and UM symbols.",
+                    "example": "BTCUSD"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "description": "Interval",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of records to return.",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 30
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.newOrder",
+              "description": "New Order (TRADE)\nSend in a new order.\n\nNotes:\n- Additional mandatory parameters based on `type`:\n  - Order with type `STOP`, parameter `timeInForce` can be sent ( default `GTC`).\n  - Order with type `TAKE_PROFIT`, parameter `timeInForce` can be sent ( default `GTC`).\n  - Condition orders will be triggered when:\n  - If parameter`priceProtect`is sent as true:\n  - when price reaches the `stopPrice` ，the difference rate between \"MARK_PRICE\" and \"CONTRACT_PRICE\" cannot be larger than the \"triggerProtect\" of the symbol\n  - \"triggerProtect\" of a symbol can be got from `GET /dapi/v1/exchangeInfo`\n  - `STOP`, `STOP_MARKET`:\n  - BUY: latest price (\"MARK_PRICE\" or \"CONTRACT_PRICE\") >= `stopPrice`\n  - SELL: latest price (\"MARK_PRICE\" or \"CONTRACT_PRICE\")\n  -`TAKE_PROFIT`, `TAKE_PROFIT_MARKET`:\n  - BUY: latest price (\"MARK_PRICE\" or \"CONTRACT_PRICE\")\n  - SELL: latest price (\"MARK_PRICE\" or \"CONTRACT_PRICE\") >= `stopPrice`\n  - `TRAILING_STOP_MARKET`:\n  - BUY: the lowest price after order placed ``= the lowest price * (1 + `callbackRate`)\n  - SELL: the highest price after order placed >= `activationPrice`, and the latest price\n\n  - For `TRAILING_STOP_MARKET`, if you got such error code. > `{\"code\": -2021, \"msg\": \"Order would immediately trigger.\"}` > means that the parameters you send do not meet the following requirements:\n  - BUY: `activationPrice` should be smaller than latest price.\n  - SELL: `activationPrice` should be larger than latest price.\n  - If `newOrderRespType ` is sent as `RESULT` :\n  - `MARKET` order: the final FILLED result of the order will be return directly.\n  - `LIMIT` order with special `timeInForce`: the final status result of the order(FILLED or EXPIRED) will be returned directly.\n  - `STOP_MARKET`, `TAKE_PROFIT_MARKET` with `closePosition`=`true`:\n  - Follow the same rules for condition orders.\n  - If triggered,**close all** current long position( if `SELL`) or current short position( if `BUY`).\n  - Cannot be used with `quantity` parameter\n  - Cannot be used with `reduceOnly` parameter\n  - In Hedge Mode,cannot be used with `BUY` orders in `LONG` position side. and cannot be used with `SELL` orders in `SHORT` position side\n\n  - `selfTradePreventionMode` is only effective when `timeInForce` set to `IOC` or `GTC`.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Symbol",
+                    "example": "BTCUSD_200925"
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "BUY",
+                      "SELL"
+                    ],
+                    "example": "BUY"
+                  },
+                  "positionSide": {
+                    "type": "string",
+                    "description": "Default `BOTH` for One-way Mode ; `LONG` or `SHORT` for Hedge Mode. It must be sent in Hedge Mode.",
+                    "enum": [
+                      "BOTH",
+                      "LONG",
+                      "SHORT"
+                    ],
+                    "example": "BOTH"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "**After CM migration, stop-type values (`STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET`, `TRAILING_STOP_MARKET`) are no longer accepted by this endpoint and will return `-4120`. Use the new `/dapi/v1/algoOrder` endpoint instead.**",
+                    "enum": [
+                      "LIMIT",
+                      "MARKET",
+                      "STOP",
+                      "STOP_MARKET",
+                      "TAKE_PROFIT",
+                      "TAKE_PROFIT_MARKET",
+                      "TRAILING_STOP_MARKET"
+                    ],
+                    "example": "LIMIT"
+                  },
+                  "reduceOnly": {
+                    "type": "string",
+                    "description": "\"true\" or \"false\". Cannot be sent in Hedge\nMode; cannot be sent with `closePosition`=`true`(Close-All)",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "example": "TRUE"
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "description": "quantity measured by contract number, Cannot be sent with `closePosition`=`true`",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "price": {
+                    "type": "number",
+                    "description": "Order price",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "newClientOrderId": {
+                    "type": "string",
+                    "description": "A unique id among open orders. Automatically generated if\nnot sent. Can only be string following the rule:\n`^[\\.A-Z\\:/a-z0-9_-]{1,36}$`",
+                    "example": "1"
+                  },
+                  "stopPrice": {
+                    "type": "number",
+                    "description": "Used with `STOP/STOP_MARKET` or `TAKE_PROFIT/TAKE_PROFIT_MARKET` orders.",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "closePosition": {
+                    "type": "string",
+                    "description": "`true`, `false`；Close-All,used with `STOP_MARKET` or `TAKE_PROFIT_MARKET`.",
+                    "example": "true"
+                  },
+                  "activationPrice": {
+                    "type": "number",
+                    "description": "Used with `TRAILING_STOP_MARKET` orders, default as the\nlatest price(supporting different `workingType`)",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "callbackRate": {
+                    "type": "number",
+                    "description": "Used with `TRAILING_STOP_MARKET` orders, min 0.1, max 10 where 1 for 1%",
+                    "format": "float",
+                    "example": 5000
+                  },
+                  "timeInForce": {
+                    "type": "string",
+                    "enum": [
+                      "GTC",
+                      "IOC",
+                      "FOK",
+                      "GTX"
+                    ],
+                    "example": "GTC"
+                  },
+                  "workingType": {
+                    "type": "string",
+                    "description": "'stopPrice triggered by: \"MARK_PRICE\", \"CONTRACT_PRICE\".",
+                    "enum": [
+                      "MARK_PRICE",
+                      "CONTRACT_PRICE"
+                    ],
+                    "example": "MARK_PRICE"
+                  },
+                  "priceProtect": {
+                    "type": "string",
+                    "description": "\"true\" or \"false\". Used with\n`STOP/STOP_MARKET` or `TAKE_PROFIT/TAKE_PROFIT_MARKET`\norders.",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "example": "TRUE"
+                  },
+                  "newOrderRespType": {
+                    "type": "string",
+                    "enum": [
+                      "ACK",
+                      "RESULT"
+                    ],
+                    "example": "ACK"
+                  },
+                  "priceMatch": {
+                    "type": "string",
+                    "description": "only avaliable for `LIMIT`/`STOP`/`TAKE_PROFIT` order;\nCan't be passed together with `price`",
+                    "enum": [
+                      "OPPONENT",
+                      "OPPONENT_5",
+                      "OPPONENT_10",
+                      "OPPONENT_20",
+                      "QUEUE",
+                      "QUEUE_5",
+                      "QUEUE_10",
+                      "QUEUE_20"
+                    ],
+                    "example": "OPPONENT"
+                  },
+                  "selfTradePreventionMode": {
+                    "type": "string",
+                    "description": "`EXPIRE_TAKER`:expire taker order when STP triggers/\n`EXPIRE_MAKER`:expire taker order when STP triggers/\n`EXPIRE_BOTH`:expire both orders when STP triggers",
+                    "enum": [
+                      "NONE",
+                      "EXPIRE_TAKER",
+                      "EXPIRE_BOTH",
+                      "EXPIRE_MAKER"
+                    ],
+                    "example": "EXPIRE_TAKER"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "side",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.positionInformation",
+              "description": "Position Information (USER_DATA)\nGet current account information.\n\nNotes:\n- If neither `marginAsset` nor `pair` is sent, positions of all symbols with `TRADING` status will be returned.\n- for One-way Mode user, the response will only show the \"BOTH\" positions\n- for Hedge Mode user, the response will show \"BOTH\", \"LONG\", and \"SHORT\" positions. **Note** > Please use with user data stream `ACCOUNT_UPDATE` to meet your timeliness and accuracy needs.\n- Please use with user data stream ACCOUNT_UPDATE to meet your timeliness and accuracy needs.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "marginAsset": {
+                    "type": "string",
+                    "example": "USDT"
+                  },
+                  "pair": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.premiumIndexKlineData",
+              "description": "Premium index Kline Data\nPremium index kline bars of a symbol. Klines are uniquely identified by their open time.\n\nNotes:\n- If startTime and endTime are not sent, the most recent klines are returned.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both CM and UM symbols.",
+                    "example": "BTCUSD"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "description": "Interval",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of records to return.",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 30
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.queryOrder",
+              "description": "Query Order (USER_DATA)\nCheck an order's status.\n\n* These orders will not be found:\n  * order status is CANCELED or EXPIRED AND order has NO filled trade AND created time + 3 days < current time\n  * order create time + 90 days < current time\n\nNotes:\n- Either `orderId` or `origClientOrderId` must be sent.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Symbol",
+                    "example": "BTCUSD_200925"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "description": "Order ID",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "description": "Client order ID",
+                    "example": "1"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_coin.symbolPriceTicker",
+              "description": "Symbol Price Ticker\nLatest price for a symbol or symbols.\n\nNotes:\n- Symbol and pair cannot be sent together\n- If a pair is sent,tickers for all symbols of the pair will be returned\n- If either a pair or symbol is sent, tickers for all symbols of all pairs will be returned",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Symbol",
+                    "example": "BTCUSD_200626"
+                  },
+                  "pair": {
+                    "type": "string",
+                    "description": "Pair",
+                    "example": "BTCUSD"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.accountInformationV3",
+              "description": "Account Information V3 (USER_DATA)\nGet current account information. User in single-asset/ multi-assets mode will see different value, see comments in response section for detail.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.cancelOrder",
+              "description": "Cancel Order (TRADE)\nCancel an active order.\n\nNotes:\n- Either `orderId` or `origClientOrderId` must be sent.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 283194212
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "example": "myOrder1"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.changeInitialLeverage",
+              "description": "Change Initial Leverage (TRADE)\nChange user's initial leverage of specific symbol market.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "leverage": {
+                    "type": "integer",
+                    "description": "target initial leverage",
+                    "format": "int64",
+                    "minimum": 1,
+                    "maximum": 125,
+                    "example": 1
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "leverage"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.changeMarginType",
+              "description": "Change Margin Type (TRADE)\nChange symbol level margin type",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "marginType": {
+                    "type": "string",
+                    "enum": [
+                      "ISOLATED",
+                      "CROSSED"
+                    ],
+                    "example": "ISOLATED"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "marginType"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.continuousContractKlineCandlestickData",
+              "description": "Continuous Contract Kline/Candlestick Data\nKline/candlestick bars for a specific contract type.\nKlines are uniquely identified by their open time.\n\nNotes:\n- If startTime and endTime are not sent, the most recent klines are returned.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "pair": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both UM and CM pair values.",
+                    "example": "BTCUSDT"
+                  },
+                  "contractType": {
+                    "type": "string",
+                    "description": "Futurestype",
+                    "enum": [
+                      "PERPETUAL",
+                      "CURRENT_QUARTER",
+                      "NEXT_QUARTER",
+                      "TRADIFI_PERPETUAL"
+                    ],
+                    "example": "PERPETUAL"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 50
+                  }
+                },
+                "required": [
+                  "pair",
+                  "contractType",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.currentAllOpenOrders",
+              "description": "Current All Open Orders (USER_DATA)\nGet all open orders on a symbol.\n\nNotes:\n- If the symbol is not sent, orders for all symbols will be returned in an array.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.exchangeInformation",
+              "description": "Exchange Information\nCurrent exchange trading rules and symbol information",
+              "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.futuresAccountBalanceV3",
+              "description": "Futures Account Balance V3 (USER_DATA)\nQuery account balance information.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.indexPriceKlineCandlestickData",
+              "description": "Index Price Kline/Candlestick Data\nKline/candlestick bars for the index price of a pair.\nKlines are uniquely identified by their open time.\n\nNotes:\n- If startTime and endTime are not sent, the most recent klines are returned.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "pair": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both UM and CM pair values.",
+                    "example": "BTCUSDT"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 50
+                  }
+                },
+                "required": [
+                  "pair",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.klineCandlestickData",
+              "description": "Kline/Candlestick Data\nKline/candlestick bars for a symbol.\nKlines are uniquely identified by their open time.\n\nNotes:\n- If startTime and endTime are not sent, the most recent klines are returned.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both UM and CM symbols.",
+                    "example": "BTCUSDT"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 50
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.markPriceKlineCandlestickData",
+              "description": "Mark Price Kline/Candlestick Data\nKline/candlestick bars for the mark price of a symbol.\nKlines are uniquely identified by their open time.\n\nNotes:\n- If startTime and endTime are not sent, the most recent klines are returned.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both UM and CM symbols.",
+                    "example": "BTCUSDT"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 50
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.newOrder",
+              "description": "New Order (TRADE)\nSend in a new order.\n\nNotes:\nAdditional mandatory parameters based on `type`:\n\n| Type | Additional mandatory parameters |\n|------|----------------------------------|\n| `LIMIT` | `timeInForce`, `quantity`, `price` |\n| `MARKET` | `quantity` |\n\n- If `newOrderRespType` is sent as `RESULT`:\n  - `MARKET` order: the final FILLED result of the order will be returned directly.\n  - `LIMIT` order with special `timeInForce`: the final status result of the order (FILLED or EXPIRED) will be returned directly.\n- `selfTradePreventionMode` is only effective when `timeInForce` is set to `IOC`, `GTC`, or `GTD`.\n- In extreme market conditions, `timeInForce` `GTD` order auto-cancel time might be delayed compared to `goodTillDate`.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "BUY",
+                      "SELL"
+                    ],
+                    "example": "BUY"
+                  },
+                  "positionSide": {
+                    "type": "string",
+                    "description": "Default `BOTH` for One-way Mode ; `LONG` or `SHORT` for Hedge Mode. It must be sent in Hedge Mode.",
+                    "example": "BOTH"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Order type",
+                    "enum": [
+                      "LIMIT",
+                      "MARKET",
+                      "STOP",
+                      "STOP_MARKET",
+                      "TAKE_PROFIT",
+                      "TAKE_PROFIT_MARKET",
+                      "TRAILING_STOP_MARKET"
+                    ],
+                    "example": "LIMIT"
+                  },
+                  "timeInForce": {
+                    "type": "string",
+                    "enum": [
+                      "GTC",
+                      "IOC",
+                      "FOK",
+                      "GTX",
+                      "GTD",
+                      "RPI"
+                    ],
+                    "example": "GTC"
+                  },
+                  "reduceOnly": {
+                    "type": "string",
+                    "description": "Cannot be sent in Hedge Mode",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "example": "TRUE"
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "price": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "newClientOrderId": {
+                    "type": "string",
+                    "description": "A unique id among open orders. Automatically generated if not sent. Can only be string following the rule: `^[\\.A-Z\\:/a-z0-9_-]{1,36}$`",
+                    "example": "1"
+                  },
+                  "newOrderRespType": {
+                    "type": "string",
+                    "enum": [
+                      "ACK",
+                      "RESULT"
+                    ],
+                    "example": "ACK"
+                  },
+                  "priceMatch": {
+                    "type": "string",
+                    "description": "only avaliable for `LIMIT`/`STOP`/`TAKE_PROFIT` order; Can't be passed together with `price`",
+                    "enum": [
+                      "OPPONENT",
+                      "OPPONENT_5",
+                      "OPPONENT_10",
+                      "OPPONENT_20",
+                      "QUEUE",
+                      "QUEUE_5",
+                      "QUEUE_10",
+                      "QUEUE_20"
+                    ],
+                    "example": "OPPONENT"
+                  },
+                  "selfTradePreventionMode": {
+                    "type": "string",
+                    "description": "`EXPIRE_TAKER`:expire taker order when STP triggers/ `EXPIRE_MAKER`:expire taker order when STP triggers/ `EXPIRE_BOTH`:expire both orders when STP triggers; default `EXPIRE_MAKER`",
+                    "enum": [
+                      "EXPIRE_TAKER",
+                      "EXPIRE_BOTH",
+                      "EXPIRE_MAKER"
+                    ],
+                    "example": "EXPIRE_TAKER"
+                  },
+                  "goodTillDate": {
+                    "type": "integer",
+                    "description": "order cancel time for timeInForce `GTD`, mandatory when `timeInforce` set to `GTD`; order the timestamp only retains second-level precision, ms part will be ignored; The goodTillDate timestamp must be greater than the current time plus 600 seconds and smaller than 253402300799000",
+                    "format": "int64",
+                    "example": 1770736694138
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "side",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.positionInformationV2",
+              "description": "Position Information V2 (USER_DATA)\nGet current position information.\n\nNotes:\n- Please use with user data stream `ACCOUNT_UPDATE` to meet your timeliness and accuracy needs.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.premiumIndexKlineData",
+              "description": "Premium index Kline Data\nPremium index kline bars of a symbol. Klines are uniquely identified by their open time.\n\nNotes:\n- If startTime and endTime are not sent, the most recent klines are returned.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "After CM migration, accepts both UM and CM symbols.",
+                    "example": "BTCUSDT"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1m"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Start time",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "End time",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1500,
+                    "example": 50
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.queryOrder",
+              "description": "Query Order (USER_DATA)\nCheck an order's status.\n\n* These orders will not be found:\n  * order status is `CANCELED` or `EXPIRED` **AND** order has NO filled trade **AND** created time + 3 days < current time\n  * order create time + 90 days < current time\n\nNotes:\n- Either `orderId` or `origClientOrderId` must be sent.\n- `orderId` is self-increment for each specific `symbol`",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1917641
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "example": "abc"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "futures_usds.symbolPriceTicker",
+              "description": "Symbol Price Ticker\nLatest price for a symbol or symbols.\n\nNotes:\n- If the symbol is not sent, prices for all symbols will be returned in an array.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.crossMarginCollateralRatio",
+              "description": "Cross margin collateral ratio (MARKET_DATA)\nCross margin collateral ratio",
+              "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.getAllIsolatedMarginSymbol",
+              "description": "Get All Isolated Margin Symbol (MARKET_DATA)\nGet All Isolated Margin Symbol",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBBTC"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.getAllMarginAssets",
+              "description": "Get All Margin Assets (MARKET_DATA)\nGet All Margin Assets.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "asset": {
+                    "type": "string",
+                    "example": "USDC"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.marginAccountBorrowRepay",
+              "description": "Margin account borrow/repay (USER_DATA)\nMargin account borrow/repay",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "asset": {
+                    "type": "string",
+                    "example": "USDT"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "description": "`TRUE` for Isolated Margin, `FALSE` for Cross Margin",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "TRUE"
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "description": "Only for Isolated margin",
+                    "example": "BTCUSDT"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "example": "1.0"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "BORROW",
+                      "REPAY"
+                    ],
+                    "example": "BORROW"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "asset",
+                  "isIsolated",
+                  "amount",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.marginAccountCancelAllOpenOrdersOnASymbol",
+              "description": "Margin Account Cancel all Open Orders on a Symbol (TRADE)\nCancels all active orders on a symbol for margin account.<br></br>\nThis includes OCO orders.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "FALSE"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.marginAccountCancelOrder",
+              "description": "Margin Account Cancel Order (TRADE)\nCancel an active order for margin account.\n\nNotes:\n- Either orderId or origClientOrderId must be sent.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "LTCBTC"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "FALSE"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "newClientOrderId": {
+                    "type": "string",
+                    "description": "Used to uniquely identify this cancel. Automatically generated by default.",
+                    "example": "1"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "jsonrpc": "2.0",
+        "id": 1788821012612,
+        "result": {
+          "tools": [
+            {
+              "name": "margin.marginAccountNewOrder",
+              "description": "Margin Account New Order (TRADE)\nPost a new order for margin account.\n\nNotes:\n- autoRepayAtCancel is suggested to set as “FALSE” to keep liability unrepaid under high frequent new order/cancel order execution",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "FALSE"
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "BUY",
+                      "SELL"
+                    ],
+                    "example": "BUY"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "LIMIT",
+                      "MARKET",
+                      "STOP_LOSS",
+                      "STOP_LOSS_LIMIT",
+                      "TAKE_PROFIT",
+                      "TAKE_PROFIT_LIMIT",
+                      "LIMIT_MAKER"
+                    ],
+                    "example": "LIMIT"
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "quoteOrderQty": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "price": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "stopPrice": {
+                    "type": "number",
+                    "description": "Used with `STOP_LOSS`, `STOP_LOSS_LIMIT`, `TAKE_PROFIT`, and `TAKE_PROFIT_LIMIT` orders.",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "newClientOrderId": {
+                    "type": "string",
+                    "description": "A unique id among open orders. Automatically generated if not sent.",
+                    "example": "1"
+                  },
+                  "icebergQty": {
+                    "type": "number",
+                    "description": "Used with `LIMIT`, `STOP_LOSS_LIMIT`, and `TAKE_PROFIT_LIMIT` to create an iceberg order.",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "newOrderRespType": {
+                    "type": "string",
+                    "description": "MARKET and LIMIT order types default to FULL, all other orders default to ACK.",
+                    "enum": [
+                      "ACK",
+                      "RESULT",
+                      "FULL"
+                    ],
+                    "example": "ACK"
+                  },
+                  "sideEffectType": {
+                    "type": "string",
+                    "enum": [
+                      "NO_SIDE_EFFECT",
+                      "MARGIN_BUY",
+                      "AUTO_REPAY",
+                      "AUTO_BORROW_REPAY"
+                    ],
+                    "example": "NO_SIDE_EFFECT"
+                  },
+                  "timeInForce": {
+                    "type": "string",
+                    "enum": [
+                      "GTC",
+                      "IOC",
+                      "FOK"
+                    ],
+                    "example": "GTC"
+                  },
+                  "selfTradePreventionMode": {
+                    "type": "string",
+                    "enum": [
+                      "EXPIRE_TAKER",
+                      "EXPIRE_MAKER",
+                      "EXPIRE_BOTH",
+                      "NONE"
+                    ],
+                    "example": "NONE"
+                  },
+                  "trailingDelta": {
+                    "type": "integer",
+                    "description": "Used with `STOP_LOSS`, `STOP_LOSS_LIMIT`, `TAKE_PROFIT`, and `TAKE_PROFIT_LIMIT` orders.",
+                    "format": "int64",
+                    "example": 100
+                  },
+                  "autoRepayAtCancel": {
+                    "type": "boolean",
+                    "description": "Only when MARGIN_BUY or AUTO_BORROW_REPAY order takes effect, true means that the debt generated by the order needs to be repaid after the order is cancelled.",
+                    "example": true
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "side",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.queryCrossMarginAccountDetails",
+              "description": "Query Cross Margin Account Details (USER_DATA)\nQuery Cross Margin Account Details",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.queryMarginAccountsAllOrders",
+              "description": "Query Margin Account's All Orders (USER_DATA)\nQuery Margin Account's All Orders\n\nNotes:\n- If orderId is set, it will get orders >= that orderId. Otherwise the\norders within 24 hours are returned.\n\n- For some historical orders cummulativeQuoteQty will be < 0, meaning\nthe data is not available at this time.\n\n- Less than 24 hours between startTime and endTime.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBBTC"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "FALSE"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 500,
+                    "example": 100
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.queryMarginAccountsOpenOrders",
+              "description": "Query Margin Account's Open Orders (USER_DATA)\nQuery Margin Account's Open Orders\n\nNotes:\n- If the symbol is not sent, orders for all symbols will be returned in\nan array.\n\n- When all symbols are returned, the number of requests counted against\nthe rate limiter is equal to the number of symbols currently trading on\nthe exchange.\n\n- If isIsolated =\"TRUE\", symbol must be sent.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "isolated margin pair",
+                    "example": "BNBBTC"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "FALSE"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.queryMarginAccountsOrder",
+              "description": "Query Margin Account's Order (USER_DATA)\nQuery Margin Account's Order\n\nNotes:\n- Either orderId or origClientOrderId must be sent.\n\n- For some historical orders cummulativeQuoteQty will be < 0, meaning\nthe data is not available at this time.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBBTC"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "FALSE"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.queryMarginAccountsTradeList",
+              "description": "Query Margin Account's Trade List (USER_DATA)\nQuery Margin Account's Trade List\n\nNotes:\n- If fromId is set, it will get trades >= that fromId. Otherwise the\ntrades within 24 hours are returned.\n\n- Less than 24 hours between startTime and endTime.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBBTC"
+                  },
+                  "isIsolated": {
+                    "type": "string",
+                    "enum": [
+                      "TRUE",
+                      "FALSE"
+                    ],
+                    "example": "FALSE"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "fromId": {
+                    "type": "integer",
+                    "description": "TradeId to fetch from. Default gets most recent trades.",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1000,
+                    "example": 500
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "margin.queryMaxBorrow",
+              "description": "Query Max Borrow (USER_DATA)\nQuery Max Borrow\n\nNotes:\n- If isolatedSymbol is not sent, crossed margin data will be sent.\n- `borrowLimit` is also available from [https://www.binance.com/en/margin-fee](https://www.binance.com/en/margin-fee)",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "asset": {
+                    "type": "string",
+                    "example": "BTC"
+                  },
+                  "isolatedSymbol": {
+                    "type": "string",
+                    "description": "isolated symbol",
+                    "example": "BTCUSDT"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "asset"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.deleteOpenOrders",
+              "description": "Cancel All Open Orders on a Symbol (TRADE)\nCancels all active orders on a symbol.\nThis includes orders that are part of an order list.\n\nNotes:\n**Data Source:** Matching Engine",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBUSDT"
+                  },
+                  "recvWindow": {
+                    "type": "number",
+                    "description": "Supports up to three decimal places of precision (e.g., 6000.346) so that microseconds may be specified.",
+                    "format": "float",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.deleteOrder",
+              "description": "Cancel order (TRADE)\nCancel an active order.\n\nNotes:\n**Data Source:** Matching Engine\n\n- Either `orderId` or `origClientOrderId` must be sent.\n- If both `orderId` and `origClientOrderId` are provided, the `orderId` is searched first, then the `origClientOrderId` from that result is checked against that order. If both conditions are not met the request will be rejected.\n- The performance for canceling an order (single cancel or as part of a cancel-replace) is always better when only `orderId` is sent. Sending `origClientOrderId` or both `orderId` + `origClientOrderId` will be slower.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBUSDT"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "example": "myOrder1"
+                  },
+                  "newClientOrderId": {
+                    "type": "string",
+                    "description": "Used to uniquely identify this cancel. Automatically generated by default.",
+                    "example": "cancelMyOrder1"
+                  },
+                  "cancelRestrictions": {
+                    "type": "string",
+                    "description": "Supported values: <br>`ONLY_NEW` - Cancel will succeed if the order status is `NEW`.<br> `ONLY_PARTIALLY_FILLED` - Cancel will succeed if order status is `PARTIALLY_FILLED`.",
+                    "enum": [
+                      "ONLY_NEW",
+                      "ONLY_PARTIALLY_FILLED"
+                    ],
+                    "example": "ONLY_NEW"
+                  },
+                  "recvWindow": {
+                    "type": "number",
+                    "description": "Supports up to three decimal places of precision (e.g., 6000.346) so that microseconds may be specified.",
+                    "format": "float",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.depth",
+              "description": "Order book\nOrder book\n\nNotes:\n**Data Source:** Memory",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBUSDT"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "If limit > 5000, only 5000 entries will be returned.",
+                    "maximum": 5000,
+                    "example": 1
+                  },
+                  "symbolStatus": {
+                    "type": "string",
+                    "description": "Filters for symbols that have this `tradingStatus`.\nA status mismatch returns error `-1220 SYMBOL_DOES_NOT_MATCH_STATUS`.",
+                    "enum": [
+                      "TRADING",
+                      "HALT",
+                      "BREAK"
+                    ],
+                    "example": "TRADING"
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.exchangeInfo",
+              "description": "Exchange information\nCurrent exchange trading rules and symbol information\n\nNotes:\n**Data Source:** Memory\n\n**Notes:**\n* If the value provided to `symbol` or `symbols` do not exist, the endpoint will throw an error saying the symbol is invalid.\n* All parameters are optional.\n* `permissions` can support single or multiple values (e.g. `SPOT`, `[\"MARGIN\",\"LEVERAGED\"]`). This cannot be used in combination with `symbol` or `symbols`.\n* If `permissions` parameter not provided, all symbols that have either `SPOT`, `MARGIN`, or `LEVERAGED` permission will be exposed.\n  * To display symbols with any permission you need to specify them explicitly in `permissions`: (e.g. `[\"SPOT\",\"MARGIN\",...]`.). See Account and Symbol Permissions for the full list.\n\n**Examples of Symbol Permissions Interpretation from the Response:**\n\n* `[[\"A\",\"B\"]]` means you may place an order if your account has either permission \"A\" **or** permission \"B\".\n* `[[\"A\"],[\"B\"]]` means you can place an order if your account has permission \"A\" **and** permission \"B\".\n* `[[\"A\"],[\"B\",\"C\"]]` means you can place an order if your account has permission \"A\" **and** permission \"B\" or permission \"C\". (Inclusive or is applied here, not exclusive or, so your account may have both permission \"B\" and permission \"C\".)",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Example: curl -X GET \"https://api.binance.com/api/v3/exchangeInfo?symbol=BNBBTC\"",
+                    "example": "ETHBTC"
+                  },
+                  "symbols": {
+                    "type": "array",
+                    "description": "Examples: curl -X GET \"https://api.binance.com/api/v3/exchangeInfo?symbols=%5B%22BNBBTC%22,%22BTCUSDT%22%5D\" or curl -g -X GET 'https://api.binance.com/api/v3/exchangeInfo?symbols=[\"BTCUSDT\",\"BNBBTC\"]'",
+                    "example": [
+                      "BTCUSDT",
+                      "BNBBTC"
+                    ],
+                    "items": {
+                      "type": "string",
+                      "example": "BTCUSDT"
+                    }
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "description": "Examples: curl -X GET \"https://api.binance.com/api/v3/exchangeInfo?permissions=SPOT\"\n\ncurl -X GET \"https://api.binance.com/api/v3/exchangeInfo?permissions=%5B%22MARGIN%22%2C%22LEVERAGED%22%5D\"\nor\ncurl -g -X GET 'https://api.binance.com/api/v3/exchangeInfo?permissions=[\"MARGIN\",\"LEVERAGED\"]'",
+                    "example": [
+                      "SPOT"
+                    ],
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "SPOT",
+                        "MARGIN",
+                        "LEVERAGED",
+                        "TRD_GRP_002",
+                        "TRD_GRP_003",
+                        "TRD_GRP_004",
+                        "TRD_GRP_005",
+                        "TRD_GRP_006",
+                        "TRD_GRP_007",
+                        "TRD_GRP_008",
+                        "TRD_GRP_009",
+                        "TRD_GRP_010",
+                        "TRD_GRP_011",
+                        "TRD_GRP_012",
+                        "TRD_GRP_013",
+                        "TRD_GRP_014",
+                        "TRD_GRP_015",
+                        "TRD_GRP_016",
+                        "TRD_GRP_017",
+                        "TRD_GRP_018",
+                        "TRD_GRP_019",
+                        "TRD_GRP_020",
+                        "TRD_GRP_021",
+                        "TRD_GRP_022",
+                        "TRD_GRP_023",
+                        "TRD_GRP_024",
+                        "TRD_GRP_025"
+                      ],
+                      "example": "SPOT"
+                    }
+                  },
+                  "showPermissionSets": {
+                    "type": "boolean",
+                    "description": "Controls whether the content of the `permissionSets` field is populated or not.",
+                    "example": false
+                  },
+                  "symbolStatus": {
+                    "type": "string",
+                    "description": "Filters for symbols that have this `tradingStatus`. Cannot be used in combination with `symbols` or `symbol`.",
+                    "enum": [
+                      "TRADING",
+                      "HALT",
+                      "BREAK"
+                    ],
+                    "example": "TRADING"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.getAccount",
+              "description": "Account information (USER_DATA)\nGet current account information.\n\nNotes:\n**Data Source:** Memory => Database",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "omitZeroBalances": {
+                    "type": "boolean",
+                    "description": "When set to `true`, emits only the non-zero balances of an account.",
+                    "example": false
+                  },
+                  "recvWindow": {
+                    "type": "number",
+                    "description": "Supports up to three decimal places of precision (e.g., 6000.346) so that microseconds may be specified.",
+                    "format": "float",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.getOpenOrders",
+              "description": "Current open orders (USER_DATA)\nGet all open orders on a symbol. **Careful** when accessing this with no symbol.\n\nNotes:\n**Data Source:** Memory => Database\n\n- If the symbol is not sent, orders for all symbols will be returned in an array.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "LTCBTC"
+                  },
+                  "recvWindow": {
+                    "type": "number",
+                    "description": "Supports up to three decimal places of precision (e.g., 6000.346) so that microseconds may be specified.",
+                    "format": "float",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.getOrder",
+              "description": "Query order (USER_DATA)\nCheck an order's status.\n\nNotes:\n**Data Source:** Memory => Database\n\n- Either `orderId` or `origClientOrderId` must be sent.\n- If both `orderId` and `origClientOrderId` are provided, the `orderId` is searched first, then the `origClientOrderId` from that result is checked against that order. If both conditions are not met the request will be rejected.\n- For some historical orders `cummulativeQuoteQty` will be < 0, meaning the data is not available at this time.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "LTCBTC"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "origClientOrderId": {
+                    "type": "string",
+                    "example": "myOrder1"
+                  },
+                  "recvWindow": {
+                    "type": "number",
+                    "description": "Supports up to three decimal places of precision (e.g., 6000.346) so that microseconds may be specified.",
+                    "format": "float",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.klines",
+              "description": "Kline/Candlestick data\nKline/candlestick bars for a symbol.\nKlines are uniquely identified by their open time.\n\nNotes:\n**Data Source:** Database\n\nSupported kline intervals (case-sensitive):\n\nInterval  | `interval` value\n--------- | ----------------\nseconds   | `1s`\nminutes   | `1m`, `3m`, `5m`, `15m`, `30m`\nhours     | `1h`, `2h`, `4h`, `6h`, `8h`, `12h`\ndays      | `1d`, `3d`\nweeks     | `1w`\nmonths    | `1M`\n\n**Notes:**\n\n* If `startTime` and `endTime` are not sent, the most recent klines are returned.\n* Supported values for `timeZone`:\n  * Hours and minutes (e.g. `-1:00`, `05:45`)\n  * Only hours (e.g. `0`, `8`, `4`)\n  * Accepted range is strictly [-12:00 to +14:00] inclusive\n* If `timeZone` provided, kline intervals are interpreted in that timezone instead of UTC.\n* Note that `startTime` and `endTime` are always interpreted in UTC, regardless of `timeZone`.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBUSDT"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "1s",
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1s"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1735693200000
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1735693200000
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "description": "Default: 0 (UTC)",
+                    "example": "0"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "maximum": 1000,
+                    "example": 1
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.myTrades",
+              "description": "Account trade list (USER_DATA)\nGet trades for a specific account and symbol.\n\nNotes:\n**Data Source:** Memory => Database\n\n**Notes:**:\n- If `fromId` is set, it will get trades >= that `fromId`. Otherwise most recent trades are returned.\n- The time between `startTime` and `endTime` can't be longer than 24 hours.\n- These are the supported combinations of all parameters:\n  - `symbol`\n  - `symbol` + `orderId`\n  - `symbol` + `startTime`\n  - `symbol` + `endTime`\n  - `symbol` + `fromId`\n  - `symbol` + `startTime` + `endTime`\n  - `symbol`+ `orderId` + `fromId`",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBBTC"
+                  },
+                  "orderId": {
+                    "type": "integer",
+                    "description": "This can only be used in combination with `symbol`.",
+                    "format": "int64",
+                    "example": 100234
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1735693200000
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1735693200000
+                  },
+                  "fromId": {
+                    "type": "integer",
+                    "description": "TradeId to fetch from. Default gets most recent trades.",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "maximum": 1000,
+                    "example": 1
+                  },
+                  "recvWindow": {
+                    "type": "number",
+                    "description": "Supports up to three decimal places of precision (e.g., 6000.346) so that microseconds may be specified.",
+                    "format": "float",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.newOrder",
+              "description": "New order (TRADE)\nSend in a new order.\n\nThis adds 1 order to the `EXCHANGE_MAX_ORDERS` filter and the `MAX_NUM_ORDERS` filter.\n\nUnfilled Order Count: 1\n\nNotes:\n**Data Source:** Matching Engine\n\nSome additional mandatory parameters based on order `type`:\n\nType | Additional mandatory parameters | Additional Information\n------------ | ------------| ------\n`LIMIT` | `timeInForce`, `quantity`, `price`|\n`MARKET` | `quantity` or `quoteOrderQty`| `MARKET` orders using the `quantity` field specifies the amount of the `base asset` the user wants to buy or sell at the market price. <br/> E.g. MARKET order on BTCUSDT will specify how much BTC the user is buying or selling. <br/><br/> `MARKET` orders using `quoteOrderQty` specifies the amount the user wants to spend (when buying) or receive (when selling) the `quote` asset; the correct `quantity` will be determined based on the market liquidity and `quoteOrderQty`. <br/> E.g. Using the symbol BTCUSDT: <br/> `BUY` side, the order will buy as many BTC as `quoteOrderQty` USDT can. <br/> `SELL` side, the order will sell as much BTC needed to receive `quoteOrderQty` USDT.\n`STOP_LOSS` | `quantity`, `stopPrice` or `trailingDelta`| This will execute a `MARKET` order when the conditions are met. (e.g. `stopPrice` is met or `trailingDelta` is activated)\n`STOP_LOSS_LIMIT` | `timeInForce`, `quantity`,  `price`, `stopPrice` or `trailingDelta`\n`TAKE_PROFIT` | `quantity`, `stopPrice` or `trailingDelta` | This will execute a `MARKET` order when the conditions are met. (e.g. `stopPrice` is met or `trailingDelta` is activated)\n`TAKE_PROFIT_LIMIT` | `timeInForce`, `quantity`, `price`, `stopPrice` or `trailingDelta` |\n`LIMIT_MAKER` | `quantity`, `price`| This is a `LIMIT` order that will be rejected if the order immediately matches and trades as a taker. <br/> This is also known as a POST-ONLY order.\n\n\nNotes on using parameters for Pegged Orders:\n* These parameters are allowed for `LIMIT`, `LIMIT_MAKER`, `STOP_LOSS_LIMIT`, `TAKE_PROFIT_LIMIT` orders.\n* If `pegPriceType` is specified, `price` becomes optional. Otherwise, it is still mandatory.\n* `pegPriceType=PRIMARY_PEG` means the primary peg, that is the best price on the same side of the order book as your order.\n* `pegPriceType=MARKET_PEG` means the market peg, that is the best price on the opposite side of the order book from your order.\n* Use `pegOffsetType` and `pegOffsetValue` to request a price level other than the best one. These parameters must be specified together.\n\nOther info:\n* Any `LIMIT` or `LIMIT_MAKER` type order can be made an iceberg order by sending an `icebergQty`.\n* Any order with an `icebergQty` MUST have `timeInForce` set to `GTC`.\n* For `STOP_LOSS`, `STOP_LOSS_LIMIT`, `TAKE_PROFIT_LIMIT` and `TAKE_PROFIT` orders, `trailingDelta` can be combined with `stopPrice`.\n* `MARKET` orders using `quoteOrderQty` will not break `LOT_SIZE` filter rules; the order will execute a `quantity` that will have the notional value as close as possible to `quoteOrderQty`. Trigger order price rules against market price for both MARKET and LIMIT versions:\n  * Price above market price: `STOP_LOSS` `BUY`, `TAKE_PROFIT` `SELL`\n  * Price below market price: `STOP_LOSS` `SELL`, `TAKE_PROFIT` `BUY`",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBUSDT"
+                  },
+                  "side": {
+                    "type": "string",
+                    "description": "Please see [Enums](/products/spot/enums#side) for supported values.",
+                    "enum": [
+                      "BUY",
+                      "SELL"
+                    ],
+                    "example": "BUY"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Please see [Enums](/products/spot/enums#ordertypes) for supported values.",
+                    "enum": [
+                      "MARKET",
+                      "LIMIT",
+                      "STOP_LOSS",
+                      "STOP_LOSS_LIMIT",
+                      "TAKE_PROFIT",
+                      "TAKE_PROFIT_LIMIT",
+                      "LIMIT_MAKER"
+                    ],
+                    "example": "MARKET"
+                  },
+                  "timeInForce": {
+                    "type": "string",
+                    "description": "Please see [Enums](/products/spot/enums#timeinforce) for supported values.",
+                    "enum": [
+                      "GTC",
+                      "IOC",
+                      "FOK"
+                    ],
+                    "example": "GTC"
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "quoteOrderQty": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "price": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 400
+                  },
+                  "newClientOrderId": {
+                    "type": "string",
+                    "description": "A unique id among open orders. Automatically generated if not sent.<br/> Orders with the same `newClientOrderID` can be accepted only when the previous one is filled, otherwise the order will be rejected.",
+                    "example": "myOrder1"
+                  },
+                  "strategyId": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "strategyType": {
+                    "type": "integer",
+                    "description": "The value cannot be less than `1000000`.",
+                    "minimum": 1000000,
+                    "example": 1
+                  },
+                  "stopPrice": {
+                    "type": "number",
+                    "description": "Used with `STOP_LOSS`, `STOP_LOSS_LIMIT`, `TAKE_PROFIT`, and `TAKE_PROFIT_LIMIT` orders.",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "trailingDelta": {
+                    "type": "integer",
+                    "description": "See Trailing Stop order FAQ",
+                    "format": "int64",
+                    "example": 1
+                  },
+                  "icebergQty": {
+                    "type": "number",
+                    "description": "Used with `LIMIT`, `STOP_LOSS_LIMIT`, and `TAKE_PROFIT_LIMIT` to create an iceberg order.",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "newOrderRespType": {
+                    "type": "string",
+                    "description": "`MARKET` and `LIMIT` order types default to `FULL`, all other orders default to `ACK`.",
+                    "enum": [
+                      "ACK",
+                      "RESULT",
+                      "FULL"
+                    ],
+                    "example": "ACK"
+                  },
+                  "selfTradePreventionMode": {
+                    "type": "string",
+                    "description": "The allowed enums is dependent on what is configured on the symbol.",
+                    "enum": [
+                      "NONE",
+                      "EXPIRE_TAKER",
+                      "EXPIRE_MAKER",
+                      "EXPIRE_BOTH",
+                      "DECREMENT",
+                      "TRANSFER"
+                    ],
+                    "example": "NONE"
+                  },
+                  "pegPriceType": {
+                    "type": "string",
+                    "description": "See Pegged Orders Info",
+                    "enum": [
+                      "PRIMARY_PEG",
+                      "MARKET_PEG"
+                    ],
+                    "example": "PRIMARY_PEG"
+                  },
+                  "pegOffsetValue": {
+                    "type": "integer",
+                    "description": "Price level to peg the price to (max: 100). See Pegged Orders Info",
+                    "maximum": 100,
+                    "example": 1
+                  },
+                  "pegOffsetType": {
+                    "type": "string",
+                    "description": "Only `PRICE_LEVEL` is supported. See Pegged Orders Info",
+                    "enum": [
+                      "PRICE_LEVEL"
+                    ],
+                    "example": "PRICE_LEVEL"
+                  },
+                  "recvWindow": {
+                    "type": "number",
+                    "description": "Supports up to three decimal places of precision (e.g., 6000.346) so that microseconds may be specified.",
+                    "format": "float",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "side",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.ticker24hr",
+              "description": "24hr ticker price change statistics\n24 hour rolling window price change statistics. **Careful** when accessing this with no symbol.\n\nNotes:\n**Data Source:** Memory",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Either `symbol` or `symbols` must be provided",
+                    "example": "BNBUSDT"
+                  },
+                  "symbols": {
+                    "type": "array",
+                    "description": "Either `symbol` or `symbols` must be provided\n\nExamples of accepted format for the `symbols` parameter: [\"BTCUSDT\",\"BNBUSDT\"] or %5B%22BTCUSDT%22,%22BNBUSDT%22%5D\n\nThe maximum number of symbols allowed in a request is 100.",
+                    "example": [
+                      "BTCUSDT",
+                      "BNBUSDT"
+                    ],
+                    "items": {
+                      "type": "string",
+                      "example": "BTCUSDT"
+                    }
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "FULL",
+                      "MINI"
+                    ],
+                    "example": "FULL"
+                  },
+                  "symbolStatus": {
+                    "type": "string",
+                    "description": "Filters for symbols that have this `tradingStatus`.\nFor a single symbol, a status mismatch returns error `-1220 SYMBOL_DOES_NOT_MATCH_STATUS`.\nFor multiple symbols, non-matching ones are simply excluded from the response.",
+                    "enum": [
+                      "TRADING",
+                      "HALT",
+                      "BREAK"
+                    ],
+                    "example": "TRADING"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.tickerPrice",
+              "description": "Symbol price ticker\nLatest price for a symbol or symbols.\n\nNotes:\n**Data Source:** Memory",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "description": "Parameter symbol and symbols cannot be used in combination.\nIf neither parameter is sent, prices for all symbols will be returned in an array.",
+                    "example": "BNBUSDT"
+                  },
+                  "symbols": {
+                    "type": "array",
+                    "description": "Parameter symbol and symbols cannot be used in combination.\nIf neither parameter is sent, prices for all symbols will be returned in an array.\nExamples of accepted format for the symbols parameter: [\"BTCUSDT\",\"BNBUSDT\"] or %5B%22BTCUSDT%22,%22BNBUSDT%22%5D",
+                    "example": [
+                      "BTCUSDT",
+                      "BNBUSDT"
+                    ],
+                    "items": {
+                      "type": "string",
+                      "example": "BTCUSDT"
+                    }
+                  },
+                  "symbolStatus": {
+                    "type": "string",
+                    "description": "Filters for symbols that have this `tradingStatus`.\nFor a single symbol, a status mismatch returns error `-1220 SYMBOL_DOES_NOT_MATCH_STATUS`.\nFor multiple or all symbols, non-matching ones are simply excluded from the response.",
+                    "enum": [
+                      "TRADING",
+                      "HALT",
+                      "BREAK"
+                    ],
+                    "example": "TRADING"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "spot.uiKlines",
+              "description": "UIKlines\nThe request is similar to klines having the same parameters and\nresponse.\n\n`uiKlines` return modified kline data, optimized for presentation of\ncandlestick charts.\n\nNotes:\n**Data Source:** Database\n\n- If `startTime` and `endTime` are not sent, the most recent klines are returned.\n- Supported values for `timeZone`:\n  - Hours and minutes (e.g. `-1:00`, `05:45`)\n  - Only hours (e.g. `0`, `8`, `4`)\n  - Accepted range is strictly [-12:00 to +14:00] inclusive\n- If `timeZone` provided, kline intervals are interpreted in that timezone instead of UTC.\n- Note that `startTime` and `endTime` are always interpreted in UTC, regardless of `timeZone`.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "example": "BNBUSDT"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "1s",
+                      "1m",
+                      "3m",
+                      "5m",
+                      "15m",
+                      "30m",
+                      "1h",
+                      "2h",
+                      "4h",
+                      "6h",
+                      "8h",
+                      "12h",
+                      "1d",
+                      "3d",
+                      "1w",
+                      "1M"
+                    ],
+                    "example": "INTERVAL_1s"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1735693200000
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1735693200000
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "description": "Default: 0 (UTC)",
+                    "example": "0"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "maximum": 1000,
+                    "example": 1
+                  }
+                },
+                "required": [
+                  "symbol",
+                  "interval"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "sub_account.getMainAccountAsset",
+              "description": "Query Main-account Spot Assets (For Agentic Sub-account) (USER_DATA)\nQuery the spot account assets of the main (parent) account bound to the calling Agentic sub-account.\nNotes: - Optionally pass `quoteAsset` (e.g. USDT, BTC) to value the assets; when omitted the default quote asset(USDT) is used.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "quoteAsset": {
+                    "type": "string",
+                    "description": "Optional. Valuation quote asset, e.g. USDT or BTC. When omitted the downstream default quote asset is used.",
+                    "example": "USDT"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.accountStatus",
+              "description": "Account Status (USER_DATA)\nFetch account status detail.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.allCoinsInformation",
+              "description": "All Coins' Information (USER_DATA)\nGet information of coins (available for deposit and withdraw) for user.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.dailyAccountSnapshot",
+              "description": "Daily Account Snapshot (USER_DATA)\nDaily account snapshot\n\nNotes:\n- The query time period must be less then 30 days\n- Support query within the last one month only\n- If startTimeand endTime not sent, return records of the last 7 days by default",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "SPOT",
+                      "MARGIN",
+                      "FUTURES"
+                    ],
+                    "example": "SPOT"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 7,
+                    "maximum": 30,
+                    "example": 7
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.depositAddress",
+              "description": "Deposit Address(supporting network) (USER_DATA)\nFetch deposit address with network.\n\nNotes:\n- If `network` is not send, return with default network of the coin.\n- You can get `network` and `isDefault` in `networkList` in the response of `Get /sapi/v1/capital/config/getall (HMAC SHA256)`.\n- `amount` needs to be sent if using LIGHTNING network",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "coin": {
+                    "type": "string",
+                    "description": "`coin` refers to the parent network address format that the address is using",
+                    "example": "BTC"
+                  },
+                  "network": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "coin"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.depositHistory",
+              "description": "Deposit History (supporting network) (USER_DATA)\nFetch deposit history.\n\nNotes:\n- Please notice the default `startTime` and `endTime` to make sure that time interval is within 0-90 days.\n- If both `startTime` and `endTime` are sent, time between `startTime` and `endTime` must be less than 90 days.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "includeSource": {
+                    "type": "boolean",
+                    "description": "return `sourceAddress` field when set to `true`",
+                    "example": false
+                  },
+                  "coin": {
+                    "type": "string",
+                    "example": "BTC"
+                  },
+                  "status": {
+                    "type": "integer",
+                    "description": "0: pending, 6: credited but cannot withdraw, 7: Wrong Deposit, 8: Waiting User confirm, 1: success",
+                    "format": "int64",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      6,
+                      7,
+                      8
+                    ]
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Default: 90 days from current timestamp",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "Default: present timestamp",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 0
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1000,
+                    "example": 1000
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  },
+                  "txId": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.getApiKeyPermission",
+              "description": "Get API Key Permission (USER_DATA)\nGet API Key Permission",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.queryUserUniversalTransferHistory",
+              "description": "Query User Universal Transfer History (USER_DATA)\nQuery User Universal Transfer History\n\nNotes:\n- `fromSymbol` must be sent when type are ISOLATEDMARGIN_MARGIN and ISOLATEDMARGIN_ISOLATEDMARGIN\n- `toSymbol` must be sent when type are MARGIN_ISOLATEDMARGIN and ISOLATEDMARGIN_ISOLATEDMARGIN\n- Support query within the last 6 months only\n- If `startTime`and `endTime` not sent, return records of the last 7 days by default",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "current": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1,
+                    "example": 1
+                  },
+                  "size": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 100,
+                    "example": 10
+                  },
+                  "fromSymbol": {
+                    "type": "string",
+                    "enum": [
+                      "ISOLATEDMARGIN_MARGIN",
+                      "ISOLATEDMARGIN_ISOLATEDMARGIN"
+                    ],
+                    "example": "ISOLATEDMARGIN_MARGIN"
+                  },
+                  "toSymbol": {
+                    "type": "string",
+                    "enum": [
+                      "MARGIN_ISOLATEDMARGIN",
+                      "ISOLATEDMARGIN_ISOLATEDMARGIN"
+                    ],
+                    "example": "MARGIN_ISOLATEDMARGIN"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.queryUserWalletBalance",
+              "description": "Query User Wallet Balance (USER_DATA)\nQuery User Wallet Balance",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "quoteAsset": {
+                    "type": "string",
+                    "example": "BTC"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.userUniversalTransfer",
+              "description": "User Universal Transfer (USER_DATA)\nTransfer assets between Binance accounts (spot, USDⓈ-M futures, COIN-M futures, cross margin, isolated margin, funding, options, portfolio margin).\nSpecify the transfer direction via the `type` parameter, e.g. `MAIN_UMFUTURE` transfers from Spot to USDⓈ-M Futures, `UMFUTURE_MAIN` transfers back from USDⓈ-M Futures to Spot.\n\nNotes:\n- You need to enable Permits Universal Transfer option for the API Key that requests this endpoint.\n- `fromSymbol` must be sent when type is `ISOLATEDMARGIN_MARGIN` or `ISOLATEDMARGIN_ISOLATEDMARGIN`.\n- `toSymbol` must be sent when type is `MARGIN_ISOLATEDMARGIN` or `ISOLATEDMARGIN_ISOLATEDMARGIN`.\n- ENUM of transfer types:\n- `MAIN_UMFUTURE`: Spot → USDⓈ-M Futures\n- `MAIN_CMFUTURE`: Spot → COIN-M Futures\n- `MAIN_MARGIN`: Spot → Margin (cross)\n- `UMFUTURE_MAIN`: USDⓈ-M Futures → Spot\n- `UMFUTURE_MARGIN`: USDⓈ-M Futures → Margin (cross)\n- `CMFUTURE_MAIN`: COIN-M Futures → Spot\n- `CMFUTURE_MARGIN`: COIN-M Futures → Margin (cross)\n- `MARGIN_MAIN`: Margin (cross) → Spot\n- `MARGIN_UMFUTURE`: Margin (cross) → USDⓈ-M Futures\n- `MARGIN_CMFUTURE`: Margin (cross) → COIN-M Futures\n- `ISOLATEDMARGIN_MARGIN`: Isolated margin → Margin (cross)\n- `MARGIN_ISOLATEDMARGIN`: Margin (cross) → Isolated margin\n- `ISOLATEDMARGIN_ISOLATEDMARGIN`: Isolated margin → Isolated margin\n- `MAIN_FUNDING`: Spot → Funding\n- `FUNDING_MAIN`: Funding → Spot\n- `FUNDING_UMFUTURE`: Funding → USDⓈ-M Futures\n- `UMFUTURE_FUNDING`: USDⓈ-M Futures → Funding\n- `MARGIN_FUNDING`: Margin (cross) → Funding\n- `FUNDING_MARGIN`: Funding → Margin (cross)\n- `FUNDING_CMFUTURE`: Funding → COIN-M Futures\n- `CMFUTURE_FUNDING`: COIN-M Futures → Funding\n- `MAIN_OPTION`: Spot → Options\n- `OPTION_MAIN`: Options → Spot\n- `UMFUTURE_OPTION`: USDⓈ-M Futures → Options\n- `OPTION_UMFUTURE`: Options → USDⓈ-M Futures\n- `MARGIN_OPTION`: Margin (cross) → Options\n- `OPTION_MARGIN`: Options → Margin (cross)\n- `FUNDING_OPTION`: Funding → Options\n- `OPTION_FUNDING`: Options → Funding\n- `MAIN_PORTFOLIO_MARGIN`: Spot → Portfolio Margin\n- `PORTFOLIO_MARGIN_MAIN`: Portfolio Margin → Spot",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Transfer type specifying the source and destination account.\nEach value follows the format `SOURCE_DESTINATION`:\n- `MAIN_UMFUTURE`: Spot → USDⓈ-M Futures\n- `MAIN_CMFUTURE`: Spot → COIN-M Futures\n- `MAIN_MARGIN`: Spot → Margin (cross)\n- `MAIN_FUNDING`: Spot → Funding\n- `MAIN_OPTION`: Spot → Options\n- `MAIN_PORTFOLIO_MARGIN`: Spot → Portfolio Margin\n- `UMFUTURE_MAIN`: USDⓈ-M Futures → Spot\n- `UMFUTURE_MARGIN`: USDⓈ-M Futures → Margin (cross)\n- `UMFUTURE_FUNDING`: USDⓈ-M Futures → Funding\n- `UMFUTURE_OPTION`: USDⓈ-M Futures → Options\n- `CMFUTURE_MAIN`: COIN-M Futures → Spot\n- `CMFUTURE_MARGIN`: COIN-M Futures → Margin (cross)\n- `CMFUTURE_FUNDING`: COIN-M Futures → Funding\n- `MARGIN_MAIN`: Margin (cross) → Spot\n- `MARGIN_UMFUTURE`: Margin (cross) → USDⓈ-M Futures\n- `MARGIN_CMFUTURE`: Margin (cross) → COIN-M Futures\n- `MARGIN_ISOLATEDMARGIN`: Margin (cross) → Isolated margin\n- `MARGIN_FUNDING`: Margin (cross) → Funding\n- `MARGIN_OPTION`: Margin (cross) → Options\n- `ISOLATEDMARGIN_MARGIN`: Isolated margin → Margin (cross)\n- `ISOLATEDMARGIN_ISOLATEDMARGIN`: Isolated margin → Isolated margin\n- `FUNDING_MAIN`: Funding → Spot\n- `FUNDING_UMFUTURE`: Funding → USDⓈ-M Futures\n- `FUNDING_MARGIN`: Funding → Margin (cross)\n- `FUNDING_CMFUTURE`: Funding → COIN-M Futures\n- `FUNDING_OPTION`: Funding → Options\n- `OPTION_MAIN`: Options → Spot\n- `OPTION_UMFUTURE`: Options → USDⓈ-M Futures\n- `OPTION_MARGIN`: Options → Margin (cross)\n- `OPTION_FUNDING`: Options → Funding\n- `PORTFOLIO_MARGIN_MAIN`: Portfolio Margin → Spot\n",
+                    "enum": [
+                      "MAIN_UMFUTURE",
+                      "MAIN_CMFUTURE",
+                      "MAIN_MARGIN",
+                      "UMFUTURE_MAIN",
+                      "UMFUTURE_MARGIN",
+                      "CMFUTURE_MAIN",
+                      "CMFUTURE_MARGIN",
+                      "MARGIN_MAIN",
+                      "MARGIN_UMFUTURE",
+                      "MARGIN_CMFUTURE",
+                      "ISOLATEDMARGIN_MARGIN",
+                      "MARGIN_ISOLATEDMARGIN",
+                      "ISOLATEDMARGIN_ISOLATEDMARGIN",
+                      "MAIN_FUNDING",
+                      "FUNDING_MAIN",
+                      "FUNDING_UMFUTURE",
+                      "UMFUTURE_FUNDING",
+                      "MARGIN_FUNDING",
+                      "FUNDING_MARGIN",
+                      "FUNDING_CMFUTURE",
+                      "CMFUTURE_FUNDING",
+                      "MAIN_OPTION",
+                      "OPTION_MAIN",
+                      "UMFUTURE_OPTION",
+                      "OPTION_UMFUTURE",
+                      "MARGIN_OPTION",
+                      "OPTION_MARGIN",
+                      "FUNDING_OPTION",
+                      "OPTION_FUNDING",
+                      "MAIN_PORTFOLIO_MARGIN",
+                      "PORTFOLIO_MARGIN_MAIN"
+                    ],
+                    "example": "MAIN_UMFUTURE"
+                  },
+                  "asset": {
+                    "type": "string",
+                    "example": "BTC"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 1
+                  },
+                  "fromSymbol": {
+                    "type": "string",
+                    "enum": [
+                      "ISOLATEDMARGIN_MARGIN",
+                      "ISOLATEDMARGIN_ISOLATEDMARGIN"
+                    ],
+                    "example": "ISOLATEDMARGIN_MARGIN"
+                  },
+                  "toSymbol": {
+                    "type": "string",
+                    "enum": [
+                      "MARGIN_ISOLATEDMARGIN",
+                      "ISOLATEDMARGIN_ISOLATEDMARGIN"
+                    ],
+                    "example": "MARGIN_ISOLATEDMARGIN"
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [
+                  "type",
+                  "asset",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "wallet.withdrawHistory",
+              "description": "Withdraw History (supporting network) (USER_DATA)\nFetch withdraw history\n\nNotes:\n- `network` may not be in the response for old withdraw.\n- Please notice the default `startTime` and `endTime` to make sure that time interval is within 0-90 days.\n- If both `startTime` and `endTime`are sent, time between `startTime`and `endTime`must be less than 90 days.\n- If `withdrawOrderId` is sent, time between `startTime` and `endTime` must be less than 7 days.\n- If `withdrawOrderId` is sent, `startTime` and `endTime` are not sent, will return last 7 days records by default.\n- Maximum support `idList` number is 45.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "coin": {
+                    "type": "string",
+                    "example": "BTC"
+                  },
+                  "withdrawOrderId": {
+                    "type": "string",
+                    "description": "client side id for withdrawal, if provided in POST `/sapi/v1/capital/withdraw/apply`, can be used here for\nquery.",
+                    "example": "1"
+                  },
+                  "status": {
+                    "type": "integer",
+                    "description": "0(0:Email Sent, 2:Awaiting Approval 3:Rejected 4:Processing 6:Completed)",
+                    "format": "int64",
+                    "example": 0
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "Default: 0",
+                    "format": "int64",
+                    "example": 0
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 1000,
+                    "example": 1000
+                  },
+                  "idList": {
+                    "type": "string",
+                    "description": "id list returned in the response of POST `/sapi/v1/capital/withdraw/apply`, separated by `,`"
+                  },
+                  "startTime": {
+                    "type": "integer",
+                    "description": "Default: 90 days from current timestamp",
+                    "format": "int64",
+                    "example": 1623319461670
+                  },
+                  "endTime": {
+                    "type": "integer",
+                    "description": "Default: present timestamp",
+                    "format": "int64",
+                    "example": 1641782889000
+                  },
+                  "recvWindow": {
+                    "type": "integer",
+                    "format": "int64",
+                    "maximum": 60000,
+                    "example": 5000
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "status": "DISCOVERED"
 }

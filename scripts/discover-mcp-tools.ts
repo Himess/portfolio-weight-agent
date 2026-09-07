@@ -64,8 +64,10 @@ async function main() {
     endpoint: ENDPOINT,
     discoveredAt: new Date().toISOString(),
     note:
-      "Binance does not publish the MCP tool list. This file is captured from the live server. " +
-      "Without a bearer token the server returns 401 and only the OAuth metadata is recorded.",
+      "Binance does not publish the MCP tool list. This file is captured from the live server " +
+      "with an authenticated session. Without a bearer token the server returns 401 and only " +
+      "the OAuth metadata is recorded. tools/list is paginated at 50 — a single call sees the " +
+      "first page only, which is why this follows nextCursor to exhaustion.",
   };
 
   // OAuth metadata is public and worth committing on its own.
@@ -101,15 +103,39 @@ async function main() {
     );
     record.initialize = init.body;
 
-    const tools = await rpc("tools/list", {}, TOKEN);
-    record.tools = tools.body;
-    record.status = tools.status === 200 ? "DISCOVERED" : `HTTP ${tools.status}`;
+    // The server paginates. A single tools/list returns 50 and a `nextCursor`,
+    // which is easy to miss and leaves you believing the surface is a third
+    // smaller than it is — the first capture stopped at `margin.*` and never
+    // saw spot, wallet or sub-account. Nothing in Binance's docs mentions the
+    // page size, so this follows the cursor until the server stops sending one.
+    type ToolsResult = { result?: { tools?: { name: string }[]; nextCursor?: string } };
+    const pages: unknown[] = [];
+    const all: { name: string }[] = [];
+    let cursor: string | undefined;
+    let status = 0;
 
-    const list = (tools.body as { result?: { tools?: { name: string }[] } })?.result?.tools;
-    if (list) {
-      console.log(`Discovered ${list.length} tools:`);
-      for (const t of list) console.log("  -", t.name);
-    }
+    do {
+      const page = await rpc("tools/list", cursor ? { cursor } : {}, TOKEN);
+      status = page.status;
+      pages.push(page.body);
+      const result = (page.body as ToolsResult)?.result;
+      if (result?.tools) all.push(...result.tools);
+      cursor = result?.nextCursor;
+      if (pages.length > 20) break; // a cursor that never clears is a bug, not a big list
+    } while (cursor);
+
+    record.tools = {
+      pages: pages.length,
+      pageSize: (pages[0] as ToolsResult)?.result?.tools?.length ?? null,
+      count: all.length,
+      names: all.map((t) => t.name),
+      // Verbatim, every page, because the schemas are the part nobody publishes.
+      responses: pages,
+    };
+    record.status = status === 200 ? "DISCOVERED" : `HTTP ${status}`;
+
+    console.log(`Discovered ${all.length} tools across ${pages.length} page(s):`);
+    for (const t of all) console.log("  -", t.name);
   }
 
   await mkdir(path.dirname(OUT), { recursive: true });
