@@ -843,16 +843,94 @@ function Allocate(props: {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {props.history.total > 0 && (
+          <div className="card card-p">
+            <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>What the agent has done</h2>
+            <div style={{ display: "flex", gap: 18, marginTop: 12 }}>
+              {[
+                { n: props.history.total, l: "reviews" },
+                { n: props.history.holds, l: "held" },
+                { n: props.history.approved, l: "approved" },
+              ].map((x) => (
+                <div key={x.l}>
+                  <div className="m" style={{ fontSize: 19, fontWeight: 700 }}>
+                    {x.n}
+                  </div>
+                  <div className="lbl">{x.l}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "10px 0 0", lineHeight: 1.5 }}>
+              Only an approved rebalance resets the clock the agent reads for staleness — a proposal
+              you dismissed rebalanced nothing.
+            </p>
+          </div>
+        )}
+
+        <button
+          className="btn btn-primary"
+          style={{ width: "100%", padding: "15px 0", fontSize: 14.5 }}
+          onClick={props.onReview}
+          disabled={props.busy || !validation.ok || missingFromWindow.length > 0}
+          title={
+            !validation.ok
+              ? validation.errors.join(" ")
+              : missingFromWindow.length > 0
+                ? `This window cannot price ${missingFromWindow.join(", ")}.`
+                : undefined
+          }
+        >
+          {props.busy ? "Reviewing…" : "Review my portfolio"}
+        </button>
+        {!validation.ok && (
+          // Show the actual blocker. "Weights must total 100%" is wrong and
+          // confusing when the total already reads 100% and the real problem is
+          // a newly-added asset still sitting at zero.
+          <p style={{ fontSize: 11.5, color: "var(--amber)", margin: "-8px 0 0", textAlign: "center", lineHeight: 1.5 }}>
+            {validation.errors[0]}
+            {validation.errors.length > 1 && ` (+${validation.errors.length - 1} more)`}
+          </p>
+        )}
+
+        {/*
+          Everything below is a setting, and settings are not the question this
+          screen asks. It asked nine things at once — chat, presets, weights,
+          search, categories, account, tolerance, source, two date sliders —
+          and nobody parses that. The one question is "what weights do you
+          want?"; the rest folds away with its current value on the tab, so it
+          is collapsed rather than hidden.
+        */}
+        <details className="card card-p" style={{ padding: "14px 18px" }}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 650, listStyle: "revert" }}>
+            Settings
+            <span style={{ fontWeight: 500, color: "var(--ink-3)", marginLeft: 8 }}>
+              {props.source === "public"
+                ? "live market data"
+                : props.source === "mcp"
+                  ? "your Binance account"
+                  : "demo replay"}
+              {" · "}
+              {props.preference} tolerance
+              {props.accountReady ? " · account connected" : ""}
+            </span>
+          </summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 16 }}>
         <McpPanel onConnectionChange={props.onAccountChange} />
 
         <div className="card card-p">
-          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>How closely to track</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>How far can it drift?</h2>
           <p style={{ fontSize: 12, color: "var(--ink-2)", margin: "7px 0 0", lineHeight: 1.55 }}>
-            This sets the tolerance band — how far a position may wander before the agent looks at
-            it. The band is a baseline, not a fixed number: it widens on assets that move a lot and
-            narrows on calm ones, because a volatile position drifts on noise that mostly reverses
-            on its own. You choose the line; the agent decides what to do when it is crossed,
-            including waiting.
+            A tolerance, not a schedule. It sets how far a position may wander from its target
+            before the agent looks at it —{" "}
+            <b style={{ color: "var(--ink)" }}>±1.50pp on a 40% target means it looks once that
+            position leaves 38.5–41.5%</b>. (pp = percentage points: the gap between two
+            percentages.)
+          </p>
+          <p style={{ fontSize: 12, color: "var(--ink-2)", margin: "8px 0 0", lineHeight: 1.55 }}>
+            Each asset then gets its own version of that line, scaled by how much it actually moves.
+            BTC&rsquo;s band is tighter than SUI&rsquo;s at the same target weight, because a
+            volatile position drifts on noise that mostly reverses on its own, and paying fees to
+            undo noise is just paying.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
             {(["patient", "balanced", "tight", "continuous"] as Preference[]).map((p) => (
@@ -880,18 +958,21 @@ function Allocate(props: {
                     one that will actually be applied to it.
                   */}
                   <span className="m" style={{ fontSize: 10.5, opacity: 0.6, fontWeight: 500 }}>
-                    ±{bandPpFor(p, largestWeight).toFixed(2)}pp base · {RUNGS[p].rate} ·{" "}
-                    {RUNGS[p].drift}
+                    ±{bandPpFor(p, largestWeight).toFixed(2)}pp on your largest position
+                  </span>
+                  <span style={{ fontSize: 10.5, opacity: 0.5 }}>
+                    {RUNGS[p].drift} · historically {RUNGS[p].rate}
                   </span>
                 </span>
               </button>
             ))}
           </div>
           <p style={{ fontSize: 10.5, color: "var(--ink-3)", margin: "10px 0 0", lineHeight: 1.5 }}>
-            Measured, not estimated: a year of real hourly closes with real fees and order-book
-            slippage. Rates are for a majors portfolio; a volatile one runs roughly twice as often.
-            Even the busiest setting costs under 1% of NAV a year — only the deviation is traded,
-            never the portfolio. Run <span className="m">npm run bands</span> to reproduce.
+            The rates are what these settings <i>did</i> over a year of real hourly closes,
+            with real fees and order-book slippage — an average looking backwards, not a promise
+            about next month. A volatile portfolio runs roughly twice as often. Even the busiest
+            setting costs under 1% of NAV a year, because only the deviation is traded, never the
+            portfolio. Run <span className="m">npm run bands</span> to reproduce.
             <br />
             <br />
             The real limit is you, not cost: every correction needs your approval in Binance, and an
@@ -1026,54 +1107,8 @@ function Allocate(props: {
           )}
         </div>
 
-        {props.history.total > 0 && (
-          <div className="card card-p">
-            <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>What the agent has done</h2>
-            <div style={{ display: "flex", gap: 18, marginTop: 12 }}>
-              {[
-                { n: props.history.total, l: "reviews" },
-                { n: props.history.holds, l: "held" },
-                { n: props.history.approved, l: "approved" },
-              ].map((x) => (
-                <div key={x.l}>
-                  <div className="m" style={{ fontSize: 19, fontWeight: 700 }}>
-                    {x.n}
-                  </div>
-                  <div className="lbl">{x.l}</div>
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "10px 0 0", lineHeight: 1.5 }}>
-              Only an approved rebalance resets the clock the agent reads for staleness — a proposal
-              you dismissed rebalanced nothing.
-            </p>
           </div>
-        )}
-
-        <button
-          className="btn btn-primary"
-          style={{ width: "100%", padding: "15px 0", fontSize: 14.5 }}
-          onClick={props.onReview}
-          disabled={props.busy || !validation.ok || missingFromWindow.length > 0}
-          title={
-            !validation.ok
-              ? validation.errors.join(" ")
-              : missingFromWindow.length > 0
-                ? `This window cannot price ${missingFromWindow.join(", ")}.`
-                : undefined
-          }
-        >
-          {props.busy ? "Reviewing…" : "Review my portfolio"}
-        </button>
-        {!validation.ok && (
-          // Show the actual blocker. "Weights must total 100%" is wrong and
-          // confusing when the total already reads 100% and the real problem is
-          // a newly-added asset still sitting at zero.
-          <p style={{ fontSize: 11.5, color: "var(--amber)", margin: "-8px 0 0", textAlign: "center", lineHeight: 1.5 }}>
-            {validation.errors[0]}
-            {validation.errors.length > 1 && ` (+${validation.errors.length - 1} more)`}
-          </p>
-        )}
+        </details>
       </div>
     </div>
   );

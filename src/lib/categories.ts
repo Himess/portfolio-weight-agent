@@ -14,7 +14,16 @@
  * Prices, changes and volumes never come from here — those are live.
  */
 
-export type CategoryKey = "all" | "l1" | "l2" | "defi" | "ai" | "stake" | "meme" | "cash";
+export type CategoryKey =
+  | "all"
+  | "l1"
+  | "l2"
+  | "defi"
+  | "ai"
+  | "stake"
+  | "meme"
+  | "equity"
+  | "cash";
 
 export const CATEGORIES: { key: CategoryKey; label: string }[] = [
   { key: "all", label: "All" },
@@ -24,6 +33,7 @@ export const CATEGORIES: { key: CategoryKey; label: string }[] = [
   { key: "ai", label: "AI" },
   { key: "stake", label: "Staking" },
   { key: "meme", label: "Memes" },
+  { key: "equity", label: "US stocks" },
   { key: "cash", label: "Stablecoins" },
 ];
 
@@ -56,6 +66,14 @@ const MAP: Record<string, CategoryKey[]> = {
   // Memes
   DOGE: ["meme"], SHIB: ["meme"], PEPE: ["meme"], WIF: ["meme"], BONK: ["meme"],
   FLOKI: ["meme"], MEME: ["meme"], BOME: ["meme"], NEIRO: ["meme"], TURBO: ["meme"],
+
+  // Binance's tokenized US equities. Real USDT spot pairs, and the one
+  // category here that is not crypto — worth its own chip because someone
+  // looking for it would never think to search "AAPLB".
+  AAPLB: ["equity"], MSFTB: ["equity"], NVDAB: ["equity"], GOOGLB: ["equity"],
+  TSLAB: ["equity"], METAB: ["equity"], AMZNB: ["equity"], NFLXB: ["equity"],
+  SPYB: ["equity"], QQQB: ["equity"], SOXLB: ["equity"], MSTRB: ["equity"],
+  COINB: ["equity"], HOODB: ["equity"], CRCLB: ["equity"], PLTRB: ["equity"],
 
   // Stablecoins
   USDC: ["cash"], FDUSD: ["cash"], TUSD: ["cash"], DAI: ["cash"], USDP: ["cash"],
