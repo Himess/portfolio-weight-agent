@@ -5,7 +5,68 @@
 You declare a target allocation once. The market moves. The agent watches the drift, decides whether
 acting is worth it *right now*, proposes the exact trades with a reason, and you approve.
 
+It runs two ways, on one engine:
+
+- **As an MCP server inside Claude Code**, beside Binance's own. Claude reads your real balances
+  from Binance, hands them to this agent, and sends the plan back through Binance — which shows you
+  its own confirmation dialog. This is the primary surface.
+- **As a web app** at [portfolio-weight-agent.vercel.app](https://portfolio-weight-agent.vercel.app),
+  the visual surface of the same decision.
+
 Built for the Binance Agent OS Mini Hackathon, Track A.
+
+---
+
+## Run it inside Claude Code
+
+Two MCP servers side by side: Binance's, for your account and your orders; this one, for the
+decision. Neither can do the other's job, which is the point — this agent never sees a credential
+and never places an order.
+
+```bash
+git clone https://github.com/Himess/portfolio-weight-agent && cd portfolio-weight-agent
+npm install
+```
+
+`.mcp.json` is committed, so Claude Code offers both servers on first launch in the directory. Or
+add them by hand:
+
+```bash
+claude mcp add portfolio-weight-agent -- node --env-file-if-exists=.env --import tsx src/mcp/stdio.ts
+claude mcp add --transport http binance https://agent.binance.com/mcp/agentic
+```
+
+To try it without cloning, the same server is live over Streamable HTTP:
+
+```bash
+claude mcp add --transport http portfolio-weight-agent https://portfolio-weight-agent.vercel.app/api/mcp
+```
+
+Put a judgment key in `.env` (`GEMINI_API_KEY=…`, free, no card). Without one every deterministic
+figure is still computed and the agent falls back to the plain band rule, labelled as such.
+
+### The five tools
+
+Captured from a live `tools/list` over stdio, not written by hand —
+[`docs/mcp-agent-tools.json`](docs/mcp-agent-tools.json). Reproduce the whole session with
+`npm run mcp:check`.
+
+| Tool | What it does |
+|---|---|
+| `set_allocation` | Declare target weights once. A *category* like "AI tokens" is resolved to real symbols and returned with its rationale and exclusions to approve. Untradable symbols are rejected, never silently dropped. |
+| `review_portfolio` | NAV, per-position drift, band, and what is outside it. Pure arithmetic on live prices — no model is consulted. |
+| `propose_rebalance` | The full loop. Returns the verdict, the reasoning, **the fact sheet it was decided from**, and the ordered legs with exact quantities. On a HOLD it returns the trade it *declined*, sized and priced. |
+| `explain_decision` | Answers from the stored fact sheet of the last verdict, not a fresh guess. "Why didn't you sell AVAX?" gets the numbers that actually drove the call. |
+| `list_decisions` | The decision log. A sequence of HOLDs with their reasons is the claim; one screenshot is an anecdote. |
+
+### How the pieces divide
+
+| | Who does it | Why |
+|---|---|---|
+| Read balances | Binance MCP → passed in as `holdings` | This server holds no credential and cannot call Binance's MCP server; Claude Code is the orchestrator and holds both connections. |
+| Market data | This server, directly | Binance's public endpoints need no auth. Deliberately not relayed through Claude: a model asked to carry a price will round it, and every downstream figure depends on it being exact. |
+| Decide | This server | Deterministic math, then one model call to choose among precomputed options. |
+| Place orders | Binance MCP, after **your** confirmation | There is no tool here that trades. |
 
 ---
 
@@ -58,6 +119,7 @@ A bot rebalances because a threshold was crossed. This one can decline:
 
 | Piece | Used for | Why |
 |---|---|---|
+| **MCP, as a server** | the agent itself | The decision is exposed as five tools so it can run beside Binance's own MCP server inside an AI client. That is what makes the account real: Claude Code is already a registered OAuth client, so there is no `client_id` to be issued by hand. |
 | **MCP market data** (public, no auth) | prices, klines, order-book depth, exchange filters | The entire read/analysis path needs no OAuth, so it works before any credential exists. Real depth is what makes the slippage estimate — and therefore the cost/benefit call — honest. |
 | **MCP account scope** | reading sub-account balances | So the drift table reflects a real portfolio. Optional: holdings can be entered by hand. |
 | **MCP trade scope** (Spot, Convert) | placing the approved orders | One at a time, each surfaced by Binance for your confirmation. |

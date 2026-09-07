@@ -22,10 +22,13 @@
     "watch:preview": "node --env-file-if-exists=.env --import tsx scripts/watch-preview.ts",
     "watch:scan": "node --env-file-if-exists=.env --import tsx scripts/watch-scan.ts",
     "bands": "node --env-file-if-exists=.env --import tsx scripts/band-sweep.ts",
-    "bundle": "node --import tsx scripts/bundle.ts"
+    "bundle": "node --import tsx scripts/bundle.ts",
+    "mcp": "node --env-file-if-exists=.env --import tsx src/mcp/stdio.ts",
+    "mcp:check": "node --env-file-if-exists=.env --import tsx scripts/mcp-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "next": "^15.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

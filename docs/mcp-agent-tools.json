@@ -1,0 +1,188 @@
+{
+  "capturedAt": "2026-09-07T12:55:17.438Z",
+  "server": "portfolio-weight-agent",
+  "transport": "stdio",
+  "note": "Captured from a live tools/list over stdio with the SDK client, not written by hand. Reproduce with `npm run mcp:check`.",
+  "tools": [
+    {
+      "name": "set_allocation",
+      "title": "Set the target allocation",
+      "description": "Declare target weights, once. Each target is either { symbol, weight } or { category, weight } — a category like 'AI tokens' is resolved to real symbols and returned with its rationale and exclusions for the user to approve. Weights are fractions and must sum to 1.0. Unknown or untradable symbols are rejected, never silently dropped.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "description": "A Binance base asset, e.g. BTC",
+                  "type": "string"
+                },
+                "category": {
+                  "description": "A theme to resolve, e.g. 'AI tokens'",
+                  "type": "string"
+                },
+                "weight": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "weight"
+              ]
+            }
+          },
+          "tracking": {
+            "description": "How much drift to tolerate. Sets the band: patient ±2.5pp, balanced ±1.5pp, tight ±0.75pp, continuous ±0.4pp on a 30% position, each scaled by the asset's own realised volatility.",
+            "type": "string",
+            "enum": [
+              "patient",
+              "balanced",
+              "tight",
+              "continuous"
+            ]
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "review_portfolio",
+      "title": "Where the portfolio stands",
+      "description": "NAV, per-position target/current/drift/band, and which positions are outside their band. Pure arithmetic on live Binance prices — no model is consulted and no judgment is offered. Use this when you want the numbers; use propose_rebalance when you want a decision.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "symbol",
+                "qty"
+              ]
+            },
+            "description": "Balances read from the Binance MCP server: [{ symbol, qty }]."
+          }
+        },
+        "required": [
+          "holdings"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "propose_rebalance",
+      "title": "Decide whether to act, and what to send",
+      "description": "Runs the full loop: drift, candidate trades with real order-book slippage, cost/benefit, then the timing and execution decisions. Returns REBALANCE, PARTIAL or HOLD with the reasoning and the fact sheet it was decided from. When acting, returns ordered legs with exact quantities. When holding, returns the trade it declined to make — sized and priced — because that is the claim: a threshold rule would have sent it. Places nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "symbol",
+                "qty"
+              ]
+            },
+            "description": "Balances read from the Binance MCP server: [{ symbol, qty }]."
+          },
+          "daysSinceLastRebalance": {
+            "description": "Staleness matters to the timing call. Omit if unknown.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "askedLast24h": {
+            "description": "How many proposals the user has already been shown today.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "holdings"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "explain_decision",
+      "title": "Why the last decision went that way",
+      "description": "Answers from the fact sheet the last verdict was actually made from, not from a fresh look at the market. Use it for questions like 'why didn't you sell AVAX?'.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "description": "Optional. Omitted returns the whole basis.",
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list_decisions",
+      "title": "The decision log",
+      "description": "Every verdict this agent has reached, newest first: what it decided, the factor that drove it, the drift at the time, and one line of reasoning. A sequence of HOLDs with their reasons is the product's actual claim.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}
