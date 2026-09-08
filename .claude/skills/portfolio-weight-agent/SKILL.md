@@ -142,6 +142,16 @@ Stated plainly, because each is a design decision rather than a gap:
   Drift is watched server-side and the user is notified; the decision and the
   approval both happen with a person present.
 
+## Neutrality
+
+This skill takes the user's own target weights as given. It does not choose
+assets, rank them, or hold a view on any of them, and the tickers in this
+document are examples of phrasing rather than suggestions. A resolved
+category is a mapping from the user's words to tradable symbols, returned
+with its reasoning and its exclusions for the user to accept or edit — not a
+recommendation. Nothing here is investment advice, and no outcome is safe or
+guaranteed.
+
 ## Reference
 
 Design, measurements and evidence: <https://github.com/Himess/portfolio-weight-agent>

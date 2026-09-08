@@ -1,0 +1,11 @@
+[mcp_servers.binance]
+url = "https://agent.binance.com/mcp/agentic"
+
+[mcp_servers.portfolio-weight-agent]
+command = "node"
+args = [
+    "--env-file-if-exists=.env",
+    "--import",
+    "tsx",
+    "src/mcp/stdio.ts",
+]
