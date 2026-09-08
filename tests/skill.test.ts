@@ -17,9 +17,25 @@ import { describe, expect, it } from "vitest";
  */
 
 const CANONICAL = "skills/portfolio-weight-agent/SKILL.md";
-const INSTALLED = ".claude/skills/portfolio-weight-agent/SKILL.md";
 
-const raw = readFileSync(CANONICAL, "utf8");
+/**
+ * Every client wants the skill somewhere different — Claude Code reads
+ * `.claude/skills/`, the cross-agent convention is `.agents/skills/`, and the
+ * hub wants `skills/`. Copies are listed rather than globbed so that adding a
+ * client is a deliberate line here, and forgetting to sync one is a red test.
+ *
+ * This is not hypothetical: `.agents/` was added an hour after this file and was
+ * already a section behind.
+ */
+const COPIES = [
+  ".claude/skills/portfolio-weight-agent/SKILL.md",
+  ".agents/skills/portfolio-weight-agent/SKILL.md",
+];
+
+/** Git may check these out with CRLF; the format is about fields, not bytes. */
+const read = (f: string) => readFileSync(f, "utf8").split("\r\n").join("\n");
+
+const raw = read(CANONICAL);
 
 function frontmatter(text: string): Record<string, string> {
   const end = text.indexOf("\n---\n", 4);
@@ -82,7 +98,7 @@ describe("the Skills Hub skill", () => {
     }
   });
 
-  it("is byte-identical to the copy Claude Code loads", () => {
-    expect(readFileSync(INSTALLED, "utf8")).toBe(raw);
+  it.each(COPIES)("is identical to the copy at %s", (copy) => {
+    expect(read(copy)).toBe(raw);
   });
 });
