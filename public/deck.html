@@ -96,6 +96,25 @@ h2{font-size:40px;line-height:1.14;letter-spacing:-.035em;font-weight:600;max-wi
 .pill.buy{background:var(--up-s);color:var(--up)}
 .pill.no{background:var(--dn-s);color:var(--dn)}
 
+
+/* ── Presentation mode ────────────────────────────────────────────────────
+   The deck is a scroll of fixed 1280x720 boards, which is right for reading
+   and wrong for a camera. Presenting fixes one board to the viewport and
+   scales it to fit, so the recording has no scrollbar, no neighbours and no
+   letterboxing that changes between slides. */
+body.present{overflow:hidden;padding:0;gap:0;background:#000;height:100vh}
+body.present .s{position:fixed;left:50%;top:50%;margin:0;box-shadow:none;
+  transform-origin:center center;display:none}
+body.present .s.live{display:flex}
+body.present #hint{display:none}
+
+#hint{position:fixed;right:18px;bottom:16px;z-index:50;font-size:12.5px;
+  font-family:'IBM Plex Mono',monospace;color:#B0A99B;background:rgba(20,17,16,.82);
+  border:1px solid rgba(255,255,255,.14);border-radius:99px;padding:8px 15px;
+  cursor:pointer;user-select:none;backdrop-filter:blur(6px)}
+#hint:hover{color:#FAF8F4;border-color:rgba(255,255,255,.3)}
+@media print{#hint{display:none}}
+
 @media print{body{background:#fff;padding:0;gap:0}.s{box-shadow:none;page-break-after:always}}
 </style>
 </head>
@@ -634,6 +653,84 @@ h2{font-size:40px;line-height:1.14;letter-spacing:-.035em;font-weight:600;max-wi
     <span><b></b>261 tests · no key required</span>
   </div>
 </section>
+
+
+<div id="hint">Present &nbsp;·&nbsp; F</div>
+<script>
+(function () {
+  var slides = [].slice.call(document.querySelectorAll('section.s'));
+  var i = 0, on = false;
+
+  // Boards are authored at a fixed size; scale rather than reflow, so type,
+  // rules and diagrams keep the proportions they were drawn at.
+  function fit() {
+    if (!on) return;
+    var k = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    slides.forEach(function (s) {
+      s.style.transform = 'translate(-50%,-50%) scale(' + k + ')';
+    });
+  }
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function (s, j) { s.classList.toggle('live', j === i); });
+  }
+
+  function start() {
+    on = true;
+    document.body.classList.add('present');
+    show(i);
+    fit();
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(function () {});
+    }
+  }
+
+  function stop() {
+    on = false;
+    document.body.classList.remove('present');
+    slides.forEach(function (s) { s.style.transform = ''; });
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+    slides[i].scrollIntoView({ block: 'center' });
+  }
+
+  document.getElementById('hint').addEventListener('click', function () {
+    // Enter on the slide nearest the middle of the viewport, so presenting
+    // picks up where reading left off.
+    var mid = window.innerHeight / 2, best = 0, d = Infinity;
+    slides.forEach(function (s, j) {
+      var r = s.getBoundingClientRect(), dist = Math.abs(r.top + r.height / 2 - mid);
+      if (dist < d) { d = dist; best = j; }
+    });
+    i = best;
+    start();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); on ? stop() : start(); return; }
+    if (!on) return;
+    if (e.key === 'Escape') { stop(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault(); show(i + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'Backspace') {
+      e.preventDefault(); show(i - 1);
+    } else if (e.key === 'Home') { show(0); }
+    else if (e.key === 'End') { show(slides.length - 1); }
+  });
+
+  // A click advances, because a presenter's hand is usually on the trackpad.
+  document.addEventListener('click', function (e) {
+    if (!on || e.target.closest('#hint')) return;
+    show(e.clientX < window.innerWidth * 0.25 ? i - 1 : i + 1);
+  });
+
+  window.addEventListener('resize', fit);
+  // Leaving fullscreen by any route should leave the mode too.
+  document.addEventListener('fullscreenchange', function () {
+    if (!document.fullscreenElement && on) stop();
+  });
+})();
+</script>
 
 </body>
 </html>
