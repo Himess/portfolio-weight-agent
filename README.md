@@ -223,12 +223,20 @@ tools, and the rules a calling model gets wrong without being told — read
 balances from Binance's server and pass them in, never restate a quantity, and
 treat a decline as an answer rather than something to re-roll until it agrees.
 
-The same file is installed at `.claude/skills/` so a clone loads it in Claude
-Code with nothing to copy. A test asserts the two stay byte-identical, because
-two copies of a document are two documents eventually.
+The same file is installed at `.claude/skills/` and `.agents/skills/` so a
+clone loads it in Claude Code or any agent following the cross-agent
+convention, with nothing to copy. A test asserts every copy stays identical —
+the `.agents/` one was a section behind within an hour of being added, which
+is why the test exists.
 
-One note for anyone copying the format: the hub's README documents a `title:`
-frontmatter field, but all 19 published skills use `name:`. Follow the skills.
+Submitted to the hub as
+[binance/binance-skills-hub#336](https://github.com/binance/binance-skills-hub/pull/336).
+Whether it merges is theirs to decide; the file works either way.
+
+One note for anyone copying the format: the three sources in that repo
+disagree. The README documents a `title:` field, `CONTRIBUTING.md` asks for
+`name:` with a top-level `version:`, and all 19 published skills use `name:`
+with `metadata.version`. Follow the skills — they are the ones that load.
 
 ---
 
