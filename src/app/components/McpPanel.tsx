@@ -31,6 +31,8 @@ type Status = {
   tools?: { name: string; description?: string }[];
   capabilities?: { balances: string | null; placeOrder: string | null; orderStatus: string | null } | null;
   discoveredAt?: string | null;
+  holdings?: { symbol: string; qty: number }[] | null;
+  holdingsError?: string | null;
 };
 
 export function McpPanel({ onConnectionChange }: { onConnectionChange?: (connected: boolean) => void } = {}) {
@@ -225,6 +227,46 @@ export function McpPanel({ onConnectionChange }: { onConnectionChange?: (connect
 
       {connected && status && (
         <>
+          {/*
+            Connecting an account used to change nothing you could see: the panel
+            looked the same whether it had worked or not, and the balance only
+            appeared after a full review. This is the answer to "did that work?",
+            and it is arithmetic — no model call to read it.
+          */}
+          {status.holdings && status.holdings.length > 0 && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: "9px 11px",
+                borderRadius: "var(--r-sm)",
+                background: "var(--surface-2)",
+                border: "1px solid var(--line)",
+              }}
+            >
+              <div className="lbl" style={{ marginBottom: 5 }}>
+                In this account
+              </div>
+              <div className="m" style={{ fontSize: 12, lineHeight: 1.7 }}>
+                {status.holdings.map((h) => (
+                  <span key={h.symbol} style={{ marginRight: 12 }}>
+                    {h.symbol} {Number(h.qty.toPrecision(6))}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {status.holdings && status.holdings.length === 0 && (
+            <p style={{ fontSize: 12, color: "var(--ink-2)", margin: "12px 0 0", lineHeight: 1.55 }}>
+              Connected, and the account is empty. Fund the Agentic sub-account from Binance — this
+              app cannot move funds into it.
+            </p>
+          )}
+          {status.holdingsError && (
+            <p style={{ fontSize: 11.5, color: "var(--amber)", margin: "12px 0 0", lineHeight: 1.55 }}>
+              Connected, but reading balances failed: {status.holdingsError}
+            </p>
+          )}
+
           <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
             <div>
               <div className="m" style={{ fontSize: 19, fontWeight: 700 }}>

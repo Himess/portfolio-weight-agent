@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { cachedDiscovery, discover, NotConnected } from "@/server/mcp-client";
+import { parseBalances } from "@/adapters/mcp";
+import { callTool, cachedDiscovery, discover, NotConnected } from "@/server/mcp-client";
 import { restoreSession } from "@/server/guard";
 import { clientId, getToken, MCP_ENDPOINT } from "@/server/mcp-session";
 
@@ -33,6 +34,28 @@ export async function GET(req: Request) {
     }
   }
 
+  // What the account actually holds, so connecting one shows something. Twice
+  // now the answer to "did that work?" was a panel that looked identical either
+  // way, and the app only revealed the balance after a full review — which also
+  // spends a model call to answer a question that is pure arithmetic.
+  //
+  // Failure here is not failure of the status call: the connection can be fine
+  // while the balance read is not, and saying "not connected" for that would
+  // send someone to re-paste a token that was never the problem.
+  let holdings: { symbol: string; qty: number }[] | null = null;
+  let holdingsError: string | null = null;
+
+  if (discovery?.capabilities.balances) {
+    try {
+      const raw = await callTool(discovery.capabilities.balances, {});
+      holdings = parseBalances(raw, "USDT")
+        .filter((h) => h.qty > 0)
+        .map((h) => ({ symbol: h.symbol, qty: h.qty }));
+    } catch (err) {
+      holdingsError = err instanceof Error ? err.message : "Could not read balances.";
+    }
+  }
+
   return NextResponse.json({
     connected: !(error && error.includes("connect again")),
     endpoint: MCP_ENDPOINT,
@@ -43,6 +66,8 @@ export async function GET(req: Request) {
     tools: discovery?.tools.map((t) => ({ name: t.name, description: t.description })) ?? [],
     capabilities: discovery?.capabilities ?? null,
     discoveredAt: discovery?.discoveredAt ?? null,
+    holdings,
+    holdingsError,
   });
 }
 
