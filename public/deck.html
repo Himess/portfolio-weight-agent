@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Portfolio Weight Agent</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --paper:#FAF8F4; --white:#FFFFFF;
+  --ink:#141110; --ink2:#5A544A; --ink3:#9A9284;
+  --line:#E6E1D6; --line2:#CFC8B9;
+  --gold:#F0B90B; --gold-d:#C99400; --gold-s:#FDF4D8; --gold-l:#EBD489;
+  --up:#2E8B62; --up-s:#E6F3EC;
+  --dn:#C4453B; --dn-s:#FBEBE9;
+  --btc:#F7931A; --eth:#627EEA; --usdt:#26A17B; --sui:#4DA2FF; --sol:#14B87F;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#211E1B;font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink);
+  -webkit-font-smoothing:antialiased;display:flex;flex-direction:column;align-items:center;
+  gap:28px;padding:36px 20px 100px;letter-spacing:-.011em;
+}
+
+/* Attribution marks — "runs on", never "endorsed by". Small, monochrome,
+   always under a label naming the product they belong to. */
+.mark{width:26px;height:26px;flex:none;display:block}
+.markrow{display:flex;align-items:center;gap:11px}
+.m{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+
+.s{width:1280px;height:720px;background:var(--paper);position:relative;flex:none;
+  padding:64px 76px;display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 26px 70px rgba(0,0,0,.5)}
+.s::after{content:attr(data-n);position:absolute;right:40px;bottom:30px;font-size:12px;
+  color:var(--ink3);font-family:'IBM Plex Mono',monospace}
+
+.eyebrow{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);margin-bottom:20px}
+.eyebrow i{width:22px;height:2px;background:var(--gold);border-radius:2px;display:block}
+
+h1{font-size:54px;line-height:1.08;letter-spacing:-.038em;font-weight:600;max-width:20ch}
+h2{font-size:40px;line-height:1.14;letter-spacing:-.035em;font-weight:600;max-width:24ch}
+.g{color:var(--gold-d)}
+.lede{font-size:19px;line-height:1.55;color:var(--ink2);max-width:56ch;margin-top:16px}
+.foot{margin-top:auto;padding-top:22px;border-top:1px solid var(--line);
+  font-size:16px;color:var(--ink2);display:flex;gap:34px}
+.foot span{display:flex;align-items:center;gap:9px}
+.foot b{width:6px;height:6px;border-radius:99px;background:var(--gold);display:block}
+
+.cols{display:grid;gap:44px;align-items:center;flex:1}
+.card{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:26px 28px}
+.card.gold{background:var(--gold-s);border-color:var(--gold-l)}
+.lbl{font-size:11.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:14px}
+
+.leg{display:flex;flex-direction:column;gap:13px}
+.leg div{display:flex;align-items:center;gap:12px;font-size:18px}
+.leg i{width:12px;height:12px;border-radius:4px;display:block;flex:none}
+.leg .n{font-weight:600;width:62px}
+.leg .p{margin-left:auto;color:var(--ink2)}
+
+.track{position:relative;height:34px}
+.track .bd{position:absolute;top:12px;height:10px;background:#EEE9DE;border-radius:3px}
+.track .ax{position:absolute;top:5px;bottom:5px;left:50%;width:1px;background:var(--line2)}
+.track .fl{position:absolute;top:14px;height:6px;border-radius:99px;opacity:.5}
+.track .pn{position:absolute;top:8px;height:18px;width:3px;border-radius:99px}
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:104px 1fr 96px;gap:20px;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:none}
+.row .nm{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px}
+.row .dt{width:10px;height:10px;border-radius:99px;flex:none}
+.row .vl{text-align:right;font-size:16px;font-weight:600}
+
+.node{background:var(--white);border:1px solid var(--line);border-radius:14px;
+  padding:16px 18px;text-align:center}
+.node .t{font-size:16px;font-weight:600}
+.node .d{font-size:13px;color:var(--ink3);margin-top:4px}
+.node.gold{background:var(--gold-s);border-color:var(--gold-l)}
+.node.dark{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.node.dark .d{color:#B0A99B}
+
+.flow{display:flex;align-items:center;gap:0;margin-top:30px}
+.flow .node{flex:1}
+.arrow{width:44px;height:1.5px;background:var(--line2);position:relative;flex:none}
+.arrow::after{content:"";position:absolute;right:0;top:-3.5px;border-left:7px solid var(--line2);
+  border-top:4px solid transparent;border-bottom:4px solid transparent}
+
+.stat{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:24px 26px}
+.stat .big{font-size:38px;font-weight:600;letter-spacing:-.045em;line-height:1}
+.stat .cap{font-size:15px;color:var(--ink2);margin-top:10px;line-height:1.45}
+
+.strike{text-decoration:line-through}
+.pill{display:inline-flex;align-items:center;padding:4px 11px;border-radius:99px;
+  font-size:12px;font-weight:700;letter-spacing:.04em}
+.pill.buy{background:var(--up-s);color:var(--up)}
+.pill.no{background:var(--dn-s);color:var(--dn)}
+
+@media print{body{background:#fff;padding:0;gap:0}.s{box-shadow:none;page-break-after:always}}
+</style>
+</head>
+<body>
+
+<!-- 01 · THE PLAN -->
+<section class="s" data-n="01">
+  <div class="eyebrow"><i></i>The plan</div>
+  <h1>Everyone sets a target.</h1>
+
+  <div class="cols" style="grid-template-columns:400px 1fr;margin-top:20px">
+    <svg viewBox="0 0 260 260" width="330" height="330">
+      <circle cx="130" cy="130" r="90" fill="none" stroke="#EFEAE0" stroke-width="34"/>
+      <g transform="rotate(-90 130 130)" stroke-width="34" fill="none" stroke-linecap="butt">
+        <circle cx="130" cy="130" r="90" stroke="var(--btc)"  stroke-dasharray="223 566" stroke-dashoffset="0"/>
+        <circle cx="130" cy="130" r="90" stroke="var(--eth)"  stroke-dasharray="110 566" stroke-dashoffset="-226"/>
+        <circle cx="130" cy="130" r="90" stroke="var(--usdt)" stroke-dasharray="167 566" stroke-dashoffset="-339"/>
+        <circle cx="130" cy="130" r="90" stroke="var(--sui)"  stroke-dasharray="53 566"  stroke-dashoffset="-509"/>
+      </g>
+      <text x="130" y="124" text-anchor="middle" font-family="IBM Plex Mono" font-size="13"
+        fill="#9A9284" letter-spacing="1.6">TARGET</text>
+      <text x="130" y="152" text-anchor="middle" font-family="IBM Plex Mono" font-size="26"
+        font-weight="600" fill="#141110">100%</text>
+    </svg>
+
+    <div>
+      <div class="leg">
+        <div><i style="background:var(--btc)"></i><span class="n">BTC</span>
+          <span>Bitcoin</span><span class="p m">40%</span></div>
+        <div><i style="background:var(--eth)"></i><span class="n">ETH</span>
+          <span>Ethereum</span><span class="p m">20%</span></div>
+        <div><i style="background:var(--usdt)"></i><span class="n">USDT</span>
+          <span>Cash</span><span class="p m">30%</span></div>
+        <div><i style="background:var(--sui)"></i><span class="n">SUI</span>
+          <span>Sui</span><span class="p m">10%</span></div>
+      </div>
+      <p class="lede" style="margin-top:26px">You decide this once. It is the only
+      investment decision in the whole product.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 02 · IT BREAKS -->
+<section class="s" data-n="02">
+  <div class="eyebrow"><i></i>What happens next</div>
+  <h1>The market <span class="g">moves it for you.</span></h1>
+
+  <div class="cols" style="grid-template-columns:1fr 360px;margin-top:14px">
+    <div>
+      <div class="rows">
+        <div class="row">
+          <div class="nm"><span class="dt" style="background:var(--btc)"></span>BTC</div>
+          <div class="track"><div class="bd" style="left:38%;width:24%"></div><div class="ax"></div>
+            <div class="fl" style="left:50%;width:33%;background:var(--dn)"></div>
+            <div class="pn" style="left:83%;background:var(--dn)"></div></div>
+          <div class="vl m" style="color:var(--dn)">+16.0pp</div>
+        </div>
+        <div class="row">
+          <div class="nm"><span class="dt" style="background:var(--eth)"></span>ETH</div>
+          <div class="track"><div class="bd" style="left:44%;width:12%"></div><div class="ax"></div>
+            <div class="fl" style="left:47%;width:3%;background:var(--up)"></div>
+            <div class="pn" style="left:47%;background:var(--up)"></div></div>
+          <div class="vl m" style="color:var(--ink2)">−1.0pp</div>
+        </div>
+        <div class="row">
+          <div class="nm"><span class="dt" style="background:var(--usdt)"></span>USDT</div>
+          <div class="track"><div class="bd" style="left:42%;width:16%"></div><div class="ax"></div>
+            <div class="fl" style="left:27%;width:23%;background:var(--up)"></div>
+            <div class="pn" style="left:27%;background:var(--up)"></div></div>
+          <div class="vl m" style="color:var(--up)">−11.0pp</div>
+        </div>
+        <div class="row">
+          <div class="nm"><span class="dt" style="background:var(--sui)"></span>SUI</div>
+          <div class="track"><div class="bd" style="left:45%;width:10%"></div><div class="ax"></div>
+            <div class="fl" style="left:36%;width:14%;background:var(--up)"></div>
+            <div class="pn" style="left:36%;background:var(--up)"></div></div>
+          <div class="vl m" style="color:var(--up)">−4.0pp</div>
+        </div>
+      </div>
+      <p style="font-size:14px;color:var(--ink3);margin-top:12px">
+        Shaded region = tolerance band, scaled per asset by how much it actually moves.
+        The pin is where you are.</p>
+    </div>
+
+    <div class="card" style="text-align:center;padding:34px 28px">
+      <div class="lbl" style="margin-bottom:10px">Away from target</div>
+      <div class="m" style="font-size:64px;font-weight:600;letter-spacing:-.05em;
+        color:var(--dn);line-height:1">16.0<span style="font-size:28px">pp</span></div>
+      <p style="font-size:15px;color:var(--ink2);margin-top:16px;line-height:1.5">
+        The share of the portfolio that has to change hands to get back to the plan.</p>
+    </div>
+  </div>
+
+  <div class="foot"><span><b></b>You never decided to abandon the plan. You just did not sell.</span></div>
+</section>
+
+<!-- 03 · THE TRADE NOBODY MAKES -->
+<section class="s" data-n="03">
+  <div class="eyebrow"><i></i>Why nobody fixes it</div>
+  <h1>Rebalancing means doing<br>the <span class="g">opposite</span> of what you feel.</h1>
+
+  <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:18px">
+    <div class="card" style="padding:30px 32px">
+      <div class="lbl">The winner</div>
+      <svg viewBox="0 0 420 150" width="100%" height="150">
+        <polyline points="10,132 50,120 90,124 130,98 170,104 210,74 250,80 290,48 330,54 370,22 405,16"
+          fill="none" stroke="var(--up)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="405" cy="16" r="7" fill="var(--dn)"/>
+        <circle cx="405" cy="16" r="13" fill="none" stroke="var(--dn)" stroke-width="1.5" opacity=".4"/>
+      </svg>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <span class="pill no">SELL</span>
+        <span style="font-size:18px;font-weight:600">while it is going up</span>
+      </div>
+      <p style="font-size:15.5px;color:var(--ink2);margin-top:12px;line-height:1.5">
+        It grew past its target. Correct means trimming it — right when everything in
+        you says hold.</p>
+    </div>
+
+    <div class="card" style="padding:30px 32px">
+      <div class="lbl">The laggard</div>
+      <svg viewBox="0 0 420 150" width="100%" height="150">
+        <polyline points="10,18 50,30 90,26 130,52 170,46 210,76 250,70 290,102 330,96 370,128 405,134"
+          fill="none" stroke="var(--dn)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="405" cy="134" r="7" fill="var(--up)"/>
+        <circle cx="405" cy="134" r="13" fill="none" stroke="var(--up)" stroke-width="1.5" opacity=".4"/>
+      </svg>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <span class="pill buy">BUY</span>
+        <span style="font-size:18px;font-weight:600">while it is going down</span>
+      </div>
+      <p style="font-size:15.5px;color:var(--ink2);margin-top:12px;line-height:1.5">
+        It fell below its target. Correct means adding to it — right when everything in
+        you says wait.</p>
+    </div>
+  </div>
+
+  <div class="foot"><span><b></b>The rule is simple. Following it is not.</span></div>
+</section>
+
+<!-- 04 · THE PRODUCT -->
+<section class="s" data-n="04">
+  <div class="eyebrow"><i></i>The product</div>
+  <h1 style="font-size:60px">Portfolio Weight Agent</h1>
+  <p style="font-size:28px;line-height:1.35;letter-spacing:-.03em;margin-top:18px;
+    max-width:26ch;font-weight:500">The agent proposes it.
+    <span class="g">You approve it in Binance.</span></p>
+
+  <div class="flow">
+    <div class="node"><div class="t">Declare</div><div class="d">talk, don't fill a form</div></div>
+    <div class="arrow"></div>
+    <div class="node"><div class="t">Watch</div><div class="d">live drift vs tolerance</div></div>
+    <div class="arrow"></div>
+    <div class="node gold"><div class="t">Decide</div><div class="d">act now, or wait — and say why</div></div>
+    <div class="arrow"></div>
+    <div class="node dark"><div class="t">You approve</div><div class="d">Binance's own screen</div></div>
+  </div>
+
+  <div class="foot">
+    <span><b></b>Built on Binance Agent OS</span>
+    <span><b></b>The app never places an order</span>
+    <span><b></b>No withdrawal scope exists</span>
+  </div>
+</section>
+
+<!-- 05 · BOT VS AGENT -->
+<section class="s" data-n="05">
+  <div class="eyebrow"><i></i>The distinction</div>
+  <h2>A bot applies the rule.<br>This one knows <span class="g">when not to.</span></h2>
+
+  <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:22px;align-items:start">
+    <div class="card" style="padding:28px 30px">
+      <div class="lbl">Threshold bot</div>
+      <svg viewBox="0 0 400 210" width="100%" height="210">
+        <rect x="70" y="10" width="260" height="52" rx="12" fill="#F5F1E8" stroke="#E6E1D6"/>
+        <text x="200" y="42" text-anchor="middle" font-family="Instrument Sans" font-size="17"
+          font-weight="600" fill="#141110">Band crossed</text>
+        <line x1="200" y1="62" x2="200" y2="128" stroke="#CFC8B9" stroke-width="1.5"/>
+        <polygon points="200,136 194,126 206,126" fill="#CFC8B9"/>
+        <rect x="70" y="140" width="260" height="52" rx="12" fill="#FBEBE9" stroke="#EFCFCB"/>
+        <text x="200" y="172" text-anchor="middle" font-family="Instrument Sans" font-size="17"
+          font-weight="600" fill="#C4453B">Trade</text>
+      </svg>
+      <p style="font-size:15.5px;color:var(--ink2);margin-top:14px;line-height:1.5">
+        Always. No exceptions. Including into a crash.</p>
+    </div>
+
+    <div class="card gold" style="padding:28px 30px">
+      <div class="lbl" style="color:#9A7A0C">The agent</div>
+      <svg viewBox="0 0 400 210" width="100%" height="210">
+        <rect x="70" y="4" width="260" height="44" rx="12" fill="#fff" stroke="#EBD489"/>
+        <text x="200" y="31" text-anchor="middle" font-family="Instrument Sans" font-size="16"
+          font-weight="600" fill="#141110">Band crossed</text>
+        <line x1="200" y1="48" x2="200" y2="64" stroke="#D9C68A" stroke-width="1.5"/>
+        <polygon points="200,72 194,62 206,62" fill="#D9C68A"/>
+        <rect x="52" y="76" width="296" height="44" rx="12" fill="#fff" stroke="#EBD489"/>
+        <text x="200" y="103" text-anchor="middle" font-family="Instrument Sans" font-size="16"
+          font-weight="600" fill="#141110">Is now the moment?</text>
+        <path d="M140 120 L140 148" stroke="#D9C68A" stroke-width="1.5" fill="none"/>
+        <path d="M260 120 L260 148" stroke="#D9C68A" stroke-width="1.5" fill="none"/>
+        <polygon points="140,156 134,146 146,146" fill="#D9C68A"/>
+        <polygon points="260,156 254,146 266,146" fill="#D9C68A"/>
+        <rect x="58" y="160" width="164" height="44" rx="12" fill="#E6F3EC" stroke="#BEDFCE"/>
+        <text x="140" y="187" text-anchor="middle" font-family="Instrument Sans" font-size="16"
+          font-weight="600" fill="#2E8B62">Trade this leg</text>
+        <rect x="238" y="160" width="112" height="44" rx="12" fill="#fff" stroke="#D9C68A"/>
+        <text x="294" y="187" text-anchor="middle" font-family="Instrument Sans" font-size="16"
+          font-weight="600" fill="#9A7A0C">Wait</text>
+      </svg>
+      <p style="font-size:15.5px;color:var(--ink2);margin-top:14px;line-height:1.5">
+        In the same check it can send one leg and refuse another.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 06 · THE REFUSAL -->
+<section class="s" data-n="06">
+  <div class="eyebrow"><i></i>One check, two answers</div>
+  <h2>Three positions out of band.<br><span class="g">Two sent. One refused.</span></h2>
+
+  <div style="margin-top:26px">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:18px;padding:20px 26px;
+        border-bottom:1px solid var(--line)">
+        <span class="pill buy">BUY</span>
+        <span class="m" style="font-size:20px;font-weight:600">0.00051 BTC</span>
+        <span class="m" style="font-size:19px;margin-left:auto">$40.09</span>
+        <span style="font-size:14px;color:var(--ink3);width:190px;text-align:right">
+          spot market · 0.0 bps crossing</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:18px;padding:20px 26px">
+        <span class="pill buy">BUY</span>
+        <span class="m" style="font-size:20px;font-weight:600">0.0081 ETH</span>
+        <span class="m" style="font-size:19px;margin-left:auto">$20.18</span>
+        <span style="font-size:14px;color:var(--ink3);width:190px;text-align:right">
+          spot market · 0.0 bps crossing</span>
+      </div>
+    </div>
+
+    <div style="border:1.5px dashed var(--line2);border-radius:18px;padding:22px 26px;
+      margin-top:16px;background:var(--white)">
+      <div class="lbl" style="margin-bottom:14px">Declined in the same check</div>
+      <div style="display:flex;align-items:center;gap:18px;opacity:.42">
+        <span class="pill no">BUY</span>
+        <span class="m strike" style="font-size:20px;font-weight:600">12.3 SUI</span>
+        <span class="m strike" style="font-size:19px;margin-left:auto">$10.13</span>
+        <span style="font-size:14px;color:var(--ink3);width:190px;text-align:right">
+          sized against live depth</span>
+      </div>
+      <div style="margin-top:16px;padding-top:15px;border-top:1px solid var(--line);
+        font-size:17px;color:var(--up);display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px">✕</span>
+        Not sent — this is an initial entry, and committing all capital at one price is a
+        timing bet
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span><b></b>Sized, priced, ready. A rule would have fired. The agent
+  declined and said why.</span></div>
+</section>
+
+<!-- 07 · ARCHITECTURE -->
+<section class="s" data-n="07">
+  <div class="eyebrow"><i></i>How it connects</div>
+  <h2>Two MCP servers, side by side.</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 214px 1fr;gap:0;align-items:center;
+    margin-top:38px">
+    <div class="card" style="padding:24px 26px">
+      <div class="lbl markrow"><svg class="mark" viewBox="0 0 126 126" aria-label="Binance" role="img"><g fill="#F0B90B"><path d="M38.9 53.2 63 29.1l24.1 24.1 14-14L63 1 24.9 39.1z"/><path d="M1 63l14-14 14 14-14 14z"/><path d="M38.9 72.8 63 96.9l24.1-24.1 14 14L63 125 24.9 86.9l-.1-.1z"/><path d="M97 63l14-14 14 14-14 14z"/><path d="M77.2 63 63 48.8 52.5 59.3l-1.2 1.2-2.5 2.5 14.2 14.2z"/></g></svg><span>Binance MCP</span></div>
+      <div style="font-size:17px;line-height:1.9;color:var(--ink)">
+        Reads your balances<br>Live prices &amp; depth<br>Sends the approved order<br>
+        <span style="color:var(--ink3)">Shows its own confirmation</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center">
+      <div style="flex:1;height:1.5px;background:var(--line2)"></div>
+      <div class="node dark" style="width:154px;padding:16px 14px;flex:none">
+        <div class="t" style="font-size:15px"><svg class="mark" viewBox="0 0 24 24" aria-label="Claude" role="img"><path fill="#D97757" d="M12 1.6l1.9 6.2 4.7-4.4-2.6 6 6.4-1.4-5.4 3.9 5.4 3.9-6.4-1.4 2.6 6-4.7-4.4L12 22.4 10.1 16.2l-4.7 4.4 2.6-6-6.4 1.4 5.4-3.9L1.6 8.2l6.4 1.4-2.6-6 4.7 4.4z"/></svg><span>Claude Code</span></div>
+        <div class="d" style="font-size:12px">orchestrates both</div>
+      </div>
+      <div style="flex:1;height:1.5px;background:var(--line2)"></div>
+    </div>
+
+    <div class="card gold" style="padding:24px 26px">
+      <div class="lbl markrow" style="color:#9A7A0C"><svg class="mark" viewBox="0 0 100 100" aria-label="Portfolio Weight Agent" role="img"><circle cx="50" cy="50" r="50" fill="#1a1815"/><circle cx="50" cy="50" r="40.75" fill="none" stroke="#9a958a" stroke-width="1.2"/><g fill="none" stroke="#f5f3ec" stroke-width="10.5"><path d="M 37.83 80.13 A 32.5 32.5 0 0 1 17.82 45.48"/><path d="M 21.04 35.25 A 32.5 32.5 0 0 1 57.31 18.33"/><path d="M 67.22 22.44 A 32.5 32.5 0 0 1 80.91 60.04"/></g><path d="M 83.14 74.98 A 41.5 41.5 0 0 1 47.83 91.44" fill="none" stroke="#ffd208" stroke-width="12"/></svg><span>Portfolio Weight Agent</span></div>
+      <div style="font-size:17px;line-height:1.9;color:var(--ink)">
+        Drift &amp; tolerance bands<br>Slippage from real depth<br>The decision, with a reason<br>
+        <span style="color:var(--ink3)">Never places an order</span>
+      </div>
+    </div>
+  </div>
+
+  <p style="text-align:center;font-size:16px;color:var(--ink2);margin-top:40px">
+    balances &amp; prices <span style="color:var(--ink3)">→</span> arithmetic &amp; judgment
+    <span style="color:var(--ink3)">→</span> order <span style="color:var(--ink3)">→</span>
+    <b style="color:var(--ink)">your confirmation in Binance</b></p>
+
+  <div class="foot">
+    <span><b></b>Also a web app — same core, no credentials needed</span>
+    <span><b></b>Also a Skills Hub skill</span>
+  </div>
+</section>
+
+<!-- 08 · THE BOUNDARY -->
+<section class="s" data-n="08">
+  <div class="eyebrow"><i></i>The boundary</div>
+  <h2>The model selects and explains.<br><span class="g">It never computes.</span></h2>
+
+  <div style="display:grid;grid-template-columns:1fr 84px 1fr;margin-top:34px;align-items:stretch">
+    <div class="card" style="padding:26px 28px">
+      <div class="lbl">Deterministic code</div>
+      <div style="font-size:17px;line-height:2.05">
+        Portfolio value and drift<br>
+        Volatility-scaled bands<br>
+        Order-book slippage<br>
+        Every trade quantity<br>
+        Cost per point corrected
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;padding:8px 0">
+      <div style="flex:1;width:1.5px;background:var(--line2)"></div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--ink3);
+        writing-mode:vertical-rl;padding:14px 0">ENFORCED</div>
+      <div style="flex:1;width:1.5px;background:var(--line2)"></div>
+    </div>
+
+    <div class="card gold" style="padding:26px 28px">
+      <div class="lbl" style="color:#9A7A0C">Judgment layer</div>
+      <div style="font-size:17px;line-height:2.05">
+        Act now, or wait<br>
+        Which legs to send<br>
+        "AI tokens" → which symbols<br>
+        The sentences you read<br>
+        <span style="color:var(--ink3)">— nothing numeric</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span><b></b>If the model types a figure itself, the whole response is
+  discarded and a deterministic template is rendered.</span></div>
+</section>
+
+<!-- 09 · MEASURED -->
+<section class="s" data-n="09">
+  <div class="eyebrow"><i></i>Measured, not guessed</div>
+  <h2>Every threshold came from data.</h2>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:30px">
+    <div class="stat"><div class="big m">1 yr</div>
+      <div class="cap">of real hourly closes, real fees and real book depth — used to sweep
+      the tolerance bands.</div></div>
+    <div class="stat"><div class="big m">78k</div>
+      <div class="cap">bars across two independent windows to set the one judgment
+      threshold. Where they disagreed, we stopped.</div></div>
+    <div class="stat"><div class="big m">81</div>
+      <div class="cap">tools in Binance's MCP server — published nowhere. The list
+      paginates at 50, so a single call sees 50 and looks complete. None of them
+      can withdraw; this deployment's scope opens 64.</div></div>
+    <div class="stat"><div class="big m">261</div>
+      <div class="cap">tests, and the findings we did not expect are in the README
+      too.</div></div>
+  </div>
+
+  <div class="card" style="margin-top:24px;padding:22px 26px">
+    <div class="lbl">Tolerance ladder — corrections per year, and what they cost</div>
+    <div style="display:flex;gap:38px;margin-top:6px">
+      <div style="flex:1"><div style="display:flex;align-items:flex-end;gap:8px;height:64px">
+        <div style="width:100%;height:12%;background:var(--gold);border-radius:4px 4px 0 0"></div></div>
+        <div style="font-size:14px;margin-top:8px"><b>Patient</b> · 18/yr · 0.04%</div></div>
+      <div style="flex:1"><div style="display:flex;align-items:flex-end;gap:8px;height:64px">
+        <div style="width:100%;height:26%;background:var(--gold);border-radius:4px 4px 0 0"></div></div>
+        <div style="font-size:14px;margin-top:8px"><b>Balanced</b> · 61/yr · 0.07%</div></div>
+      <div style="flex:1"><div style="display:flex;align-items:flex-end;gap:8px;height:64px">
+        <div style="width:100%;height:56%;background:var(--gold);border-radius:4px 4px 0 0"></div></div>
+        <div style="font-size:14px;margin-top:8px"><b>Tight</b> · 225/yr · 0.14%</div></div>
+      <div style="flex:1"><div style="display:flex;align-items:flex-end;gap:8px;height:64px">
+        <div style="width:100%;height:100%;background:var(--ink);border-radius:4px 4px 0 0"></div></div>
+        <div style="font-size:14px;margin-top:8px"><b>Continuous</b> · 717/yr · 0.27%</div></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- 10 · STANDING ALERTS -->
+<section class="s" data-n="10">
+  <div class="eyebrow"><i></i>While you are not looking</div>
+  <h2>It does not roam.<br><span class="g">It taps you on the shoulder.</span></h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:38px;margin-top:30px;align-items:start">
+    <div>
+      <p class="lede" style="margin-top:0">
+        The agent has no background life, and that is Binance's rule rather than ours: the MCP
+        session is bound to your own client, with no machine-to-machine grant. Nothing runs
+        unattended.
+      </p>
+      <p class="lede">
+        So the server watches the band instead. When a position crosses it you get a message
+        carrying the agent's verdict — including the verdict to wait, which is the one a threshold
+        bot can never send.
+      </p>
+      <div class="foot" style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;
+        font-size:16px;color:var(--ink2)">
+        You open it, it decides, you approve in Binance.
+      </div>
+    </div>
+
+    <div class="card" style="padding:22px 24px;background:var(--white)">
+      <div class="lbl" style="margin-bottom:14px">Telegram</div>
+      <div style="font-size:17px;font-weight:600;margin-bottom:12px">Rebalancing BTC and ETH</div>
+      <div style="font-size:15px;line-height:1.6;color:var(--ink2)">
+        Bitcoin and Ethereum have drifted from their targets, so we are buying both positions to
+        bring them back in line. Avalanche is still running hot, so we are holding off on it for now.
+      </div>
+      <div class="lbl" style="margin:18px 0 8px">Outside its band</div>
+      <div class="m" style="font-size:14px;line-height:1.8;color:var(--ink2)">
+        AVAX 19.9% against 15.0% — +4.9pp over, band ±1.2pp<br>
+        BTC 37.8% against 40.0% — −2.2pp under, band ±1.4pp<br>
+        ETH 18.2% against 20.0% — −1.8pp under, band ±0.9pp
+      </div>
+      <div class="m" style="font-size:14px;margin-top:16px;padding-top:14px;
+        border-top:1px solid var(--line);color:var(--ink3)">
+        $107,119 · 4.9pp total drift · balanced tracking<br>
+        <b style="color:var(--ink2)">Nothing has been ordered.</b> Open the app to review and approve.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 · LIVE -->
+<section class="s" data-n="11">
+  <div class="eyebrow"><i></i>Running now</div>
+  <h1>Real account.<br>Real market.<br><span class="g">Real confirmation.</span></h1>
+  <p class="lede" style="font-size:20px">Connected through Binance Agent OS. Live prices and
+  live depth. And for every order, Binance's own approval screen — in front of you.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:34px">
+    <div class="card" style="padding:22px 26px;background:var(--white)">
+      <div class="lbl" style="margin-bottom:10px">Try it — nothing to install</div>
+      <div class="m" style="font-size:19px;font-weight:600">portfolio-weight-agent.vercel.app</div>
+      <div style="font-size:15px;color:var(--ink2);margin-top:8px;line-height:1.55">
+        Live Binance prices, real order-book depth, no account and no key. You type the
+        quantities; everything else is real.
+      </div>
+    </div>
+    <div class="card" style="padding:22px 26px;background:var(--white)">
+      <div class="lbl" style="margin-bottom:10px">Read it, or run it as an agent</div>
+      <div class="m" style="font-size:19px;font-weight:600">github.com/Himess/portfolio-weight-agent</div>
+      <div class="m" style="font-size:14px;color:var(--ink2);margin-top:10px;line-height:1.7">
+        claude mcp add --transport http portfolio-weight-agent \<br>
+        &nbsp;&nbsp;https://portfolio-weight-agent.vercel.app/api/mcp
+      </div>
+    </div>
+  </div>
+
+  <div class="foot" style="font-size:16px">
+    <span><b></b>5 MCP tools · stdio &amp; Streamable HTTP</span>
+    <span><b></b>Skills Hub PR #336</span>
+    <span><b></b>261 tests · no key required</span>
+  </div>
+</section>
+
+</body>
+</html>

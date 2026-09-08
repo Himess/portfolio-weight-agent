@@ -24,32 +24,64 @@
 import { useId, useState } from "react";
 
 /**
- * Categorical hues for ring segments — identity, not magnitude.
+ * Colour for ring segments — identity, not magnitude.
  *
- * This was an ink ramp, five greys assigned by position. Two things wrong with
- * that. A sequential ramp encodes *how much*, and the ring encodes *which* — so
- * the darkest segment read as the most important rather than simply the first.
- * And keying colour to position means the colours shuffle whenever the weights
- * are re-sorted: change BTC from 40% to 10% and every segment repaints, which is
- * the one thing a legend cannot survive.
+ * This started as an ink ramp, five greys assigned by slot. Two things wrong
+ * with that: a sequential ramp encodes *how much* while the ring encodes
+ * *which*, so the darkest segment read as the most important rather than simply
+ * the first; and keying colour to position means every segment repaints when
+ * the weights re-sort, which is the one thing a legend cannot survive.
  *
- * Validated rather than chosen by eye (`validate_palette.js`, light mode):
- * lightness band, chroma floor, normal-vision separation (worst adjacent pair
- * ΔE 21.3) and contrast against the surface all pass. Deuteranopia separation on
- * one adjacent pair sits at 7.7, inside the band that is allowed only with
- * secondary encoding — which is present here three times over: the legend prints
- * the ticker and its logo, segments carry a 2px surface gap, and the table below
- * names every position.
+ * A token's own brand colour is the best answer available, because it is the
+ * only scheme where colour follows the entity *outside* this app too — BTC is
+ * orange in the deck, on Binance, and in the reader's memory. Measured against
+ * a generated palette it also separates better: worst adjacent pair across the
+ * demo set is ΔE 20.4 for normal vision and 8.5 under deuteranopia, against 7.7
+ * for the generated one.
+ *
+ * Three of them sit below 3:1 against the surface (BTC 2.24, SUI 2.58, SOL
+ * 2.50), which the validator allows only with relief — visible labels or a
+ * table. Both are present: the legend prints every ticker with its logo, and
+ * the table below names every position with its figures.
  */
+const BRAND: Record<string, string> = {
+  BTC: "#F7931A",
+  ETH: "#627EEA",
+  USDT: "#26A17B",
+  USDC: "#2775CA",
+  SOL: "#14B87F",
+  SUI: "#4DA2FF",
+  AVAX: "#E84142",
+  BNB: "#D9A600",
+  XRP: "#3B4A5A",
+  ADA: "#0033AD",
+  DOGE: "#B59A34",
+  LINK: "#2A5ADA",
+  DOT: "#C4327C",
+  LTC: "#4A6A93",
+  TRX: "#C63127",
+  NEAR: "#5A6169",
+  TAO: "#4A7C8C",
+  WLD: "#4A4A4A",
+  FET: "#4B54D6",
+  RENDER: "#C0392B",
+  VIRTUAL: "#3E7CB1",
+  ARB: "#2D6FA8",
+  OP: "#D1483F",
+  PEPE: "#4B8B3B",
+  SHIB: "#C5471E",
+};
+
+/** For anything without a brand colour. Validated: chroma, lightness, contrast. */
 export const RING_PALETTE = [
-  "#b8791a", // amber
-  "#2a6fb0", // blue
-  "#c05a3e", // terracotta
-  "#00879b", // teal
-  "#a63d62", // magenta
-  "#6b7a2e", // olive
-  "#6b4fa8", // violet
-  "#1c8f5a", // green
+  "#b8791a",
+  "#2a6fb0",
+  "#c05a3e",
+  "#00879b",
+  "#a63d62",
+  "#6b7a2e",
+  "#6b4fa8",
+  "#1c8f5a",
 ];
 
 export function ringColor(i: number): string {
@@ -57,23 +89,32 @@ export function ringColor(i: number): string {
 }
 
 /**
- * A stable colour per symbol, so a position keeps its colour when the weights
- * move. Symbols are placed in a fixed order and probe forward on collision, so
- * the mapping is deterministic and no two positions ever share a hue.
+ * A stable colour per symbol. Known tokens get their own; the rest are placed
+ * in a fixed order and probe forward on collision, so no two positions ever
+ * share a hue and a position keeps its colour when the weights move.
  */
 export function ringColors(symbols: string[]): Record<string, string> {
-  const taken = new Array<boolean>(RING_PALETTE.length).fill(false);
   const out: Record<string, string> = {};
+  const taken = new Set<string>();
+
+  for (const symbol of symbols) {
+    const brand = BRAND[symbol];
+    if (brand && !taken.has(brand)) {
+      out[symbol] = brand;
+      taken.add(brand);
+    }
+  }
 
   for (const symbol of [...new Set(symbols)].sort()) {
+    if (out[symbol]) continue;
     let h = 0;
     for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) >>> 0;
     let slot = h % RING_PALETTE.length;
-    for (let n = 0; taken[slot] && n < RING_PALETTE.length; n++) {
+    for (let n = 0; taken.has(RING_PALETTE[slot]) && n < RING_PALETTE.length; n++) {
       slot = (slot + 1) % RING_PALETTE.length;
     }
-    taken[slot] = true;
     out[symbol] = RING_PALETTE[slot];
+    taken.add(RING_PALETTE[slot]);
   }
   return out;
 }
