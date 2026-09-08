@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Portfolio } from "./components/Portfolio";
 import { Handoff, ProposalView } from "./components/Proposal";
 import { Watch } from "./components/Watch";
+import { Activity } from "./components/Activity";
 import { Ask } from "./components/Ask";
 import { Command } from "./components/Command";
 import { McpPanel } from "./components/McpPanel";
@@ -905,29 +906,7 @@ function Allocate(props: {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        {props.history.total > 0 && (
-          <div className="card card-p">
-            <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>What the agent has done</h2>
-            <div style={{ display: "flex", gap: 18, marginTop: 12 }}>
-              {[
-                { n: props.history.total, l: "reviews" },
-                { n: props.history.holds, l: "held" },
-                { n: props.history.approved, l: "approved" },
-              ].map((x) => (
-                <div key={x.l}>
-                  <div className="m" style={{ fontSize: 19, fontWeight: 700 }}>
-                    {x.n}
-                  </div>
-                  <div className="lbl">{x.l}</div>
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "10px 0 0", lineHeight: 1.5 }}>
-              Only an approved rebalance resets the clock the agent reads for staleness — a proposal
-              you dismissed rebalanced nothing.
-            </p>
-          </div>
-        )}
+        <Activity summary={props.history} revision={props.history.total} />
 
         <button
           className="btn btn-primary"
