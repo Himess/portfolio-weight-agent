@@ -8,7 +8,7 @@
  * NAV is secondary. Everything else is a supporting row.
  */
 
-import { Dev, Ring, Sparkline, Swatch, TokenLogo } from "./ui";
+import { Dev, Ring, ringColors, Sparkline, Swatch, TokenLogo } from "./ui";
 import { pct, pp, ppAbs, usd } from "@/lib/format";
 import type { PortfolioState } from "@/types";
 
@@ -29,6 +29,8 @@ export function Portfolio({
     .sort((a, b) => b.targetWeight - a.targetWeight)
     .map((r) => ({ label: r.symbol, pct: r.targetWeight * 100 }));
   const ringIndex = new Map(slices.map((s, i) => [s.label, i]));
+  // Keyed by symbol, so a position keeps its colour when the weights move.
+  const colors = ringColors(slices.map((s) => s.label));
 
   const outside = rows.filter((r) => r.outsideBand && r.symbol !== cashSymbol);
 
@@ -78,6 +80,7 @@ export function Portfolio({
             slices={slices}
             totalPct={slices.reduce((a, s) => a + s.pct, 0)}
             current={currentByLabel}
+            colors={colors}
             outsideCount={outside.length}
           />
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -92,7 +95,7 @@ export function Portfolio({
               return (
                 <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 62 }}>
-                    <Swatch i={i} />
+                    <Swatch color={colors[s.label]} />
                     <TokenLogo symbol={s.label} size={18} />
                     <span style={{ fontWeight: 600 }}>{s.label}</span>
                   </span>
@@ -149,7 +152,7 @@ export function Portfolio({
               style={{ padding: "14px 22px", borderBottom: "1px solid var(--line)" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                {i != null ? <Swatch i={i} /> : <span style={{ width: 9 }} />}
+                {i != null ? <Swatch color={colors[r.symbol]} /> : <span style={{ width: 9 }} />}
                 <TokenLogo symbol={r.symbol} size={28} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 650, fontSize: 14 }}>{r.symbol}</div>

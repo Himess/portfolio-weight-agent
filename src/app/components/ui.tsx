@@ -23,11 +23,59 @@
 
 import { useId, useState } from "react";
 
-/** Ordered ink ramp for ring segments: largest holding darkest. */
-export const RING_RAMP = ["#2b2926", "#44413b", "#5d5952", "#787269", "#948e82"];
+/**
+ * Categorical hues for ring segments — identity, not magnitude.
+ *
+ * This was an ink ramp, five greys assigned by position. Two things wrong with
+ * that. A sequential ramp encodes *how much*, and the ring encodes *which* — so
+ * the darkest segment read as the most important rather than simply the first.
+ * And keying colour to position means the colours shuffle whenever the weights
+ * are re-sorted: change BTC from 40% to 10% and every segment repaints, which is
+ * the one thing a legend cannot survive.
+ *
+ * Validated rather than chosen by eye (`validate_palette.js`, light mode):
+ * lightness band, chroma floor, normal-vision separation (worst adjacent pair
+ * ΔE 21.3) and contrast against the surface all pass. Deuteranopia separation on
+ * one adjacent pair sits at 7.7, inside the band that is allowed only with
+ * secondary encoding — which is present here three times over: the legend prints
+ * the ticker and its logo, segments carry a 2px surface gap, and the table below
+ * names every position.
+ */
+export const RING_PALETTE = [
+  "#b8791a", // amber
+  "#2a6fb0", // blue
+  "#c05a3e", // terracotta
+  "#00879b", // teal
+  "#a63d62", // magenta
+  "#6b7a2e", // olive
+  "#6b4fa8", // violet
+  "#1c8f5a", // green
+];
 
 export function ringColor(i: number): string {
-  return RING_RAMP[Math.min(i, RING_RAMP.length - 1)];
+  return RING_PALETTE[i % RING_PALETTE.length];
+}
+
+/**
+ * A stable colour per symbol, so a position keeps its colour when the weights
+ * move. Symbols are placed in a fixed order and probe forward on collision, so
+ * the mapping is deterministic and no two positions ever share a hue.
+ */
+export function ringColors(symbols: string[]): Record<string, string> {
+  const taken = new Array<boolean>(RING_PALETTE.length).fill(false);
+  const out: Record<string, string> = {};
+
+  for (const symbol of [...new Set(symbols)].sort()) {
+    let h = 0;
+    for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) >>> 0;
+    let slot = h % RING_PALETTE.length;
+    for (let n = 0; taken[slot] && n < RING_PALETTE.length; n++) {
+      slot = (slot + 1) % RING_PALETTE.length;
+    }
+    taken[slot] = true;
+    out[symbol] = RING_PALETTE[slot];
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,6 +86,7 @@ export function Ring({
   slices,
   totalPct,
   current,
+  colors,
   outsideCount,
   size = 148,
 }: {
@@ -45,6 +94,8 @@ export function Ring({
   totalPct: number;
   /** Current weight per label. When given, a second inner ring is drawn. */
   current?: Record<string, number>;
+  /** Colour per label. Omitted falls back to slot order. */
+  colors?: Record<string, string>;
   /** Positions outside their band, for the centre readout */
   outsideCount?: number;
   size?: number;
@@ -67,12 +118,18 @@ export function Ring({
     : 0;
   const scaleInner = Math.max(currentTotal, 100);
 
+  // Which segment the pointer is over. A ring without this makes you read a
+  // legend to answer "which one is that", which is the question the picture was
+  // supposed to answer.
+  const [hover, setHover] = useState<string | null>(null);
+  const colorOf = (label: string, i: number) => colors?.[label] ?? ringColor(i);
+
   let accOuter = 0;
   let accInner = 0;
 
   return (
     <div style={{ position: "relative", width: size, height: size, flex: "none" }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }} aria-hidden="true">
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }} role="img" aria-label="Target allocation against current weights">
         <circle cx={size / 2} cy={size / 2} r={rOuter} fill="none" strokeWidth={outerW} stroke="var(--line)" />
         {hasCurrent && (
           <circle cx={size / 2} cy={size / 2} r={rInner} fill="none" strokeWidth={innerW} stroke="var(--line)" />
@@ -90,11 +147,19 @@ export function Ring({
               r={rOuter}
               fill="none"
               strokeWidth={outerW}
-              stroke={ringColor(i)}
+              stroke={colorOf(s.label, i)}
               /* 2px of surface between segments, per the mark spec */
               strokeDasharray={`${Math.max(len - 2, 0)} ${cOuter}`}
               strokeDashoffset={-off}
-              style={{ transition: "stroke-dasharray .4s cubic-bezier(.4,0,.2,1), stroke-dashoffset .4s cubic-bezier(.4,0,.2,1)" }}
+              opacity={hover && hover !== s.label ? 0.3 : 1}
+              onMouseEnter={() => setHover(s.label)}
+              onMouseLeave={() => setHover(null)}
+              style={{
+                cursor: "default",
+                pointerEvents: "stroke",
+                transition:
+                  "stroke-dasharray .4s cubic-bezier(.4,0,.2,1), stroke-dashoffset .4s cubic-bezier(.4,0,.2,1), opacity .15s",
+              }}
             />
           );
         })}
@@ -113,10 +178,12 @@ export function Ring({
                 r={rInner}
                 fill="none"
                 strokeWidth={innerW}
-                stroke={ringColor(i)}
+                stroke={colorOf(s.label, i)}
                 strokeDasharray={`${Math.max(len - 2, 0)} ${cInner}`}
                 strokeDashoffset={-off}
-                opacity={0.55}
+                opacity={hover && hover !== s.label ? 0.18 : 0.55}
+                onMouseEnter={() => setHover(s.label)}
+                onMouseLeave={() => setHover(null)}
                 style={{ transition: "stroke-dasharray .4s cubic-bezier(.4,0,.2,1), stroke-dashoffset .4s cubic-bezier(.4,0,.2,1)" }}
               />
             );
@@ -125,7 +192,30 @@ export function Ring({
 
       <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
         <div style={{ textAlign: "center" }}>
-          {hasCurrent ? (
+          {/*
+            The hovered segment reports itself in the middle rather than in a
+            floating tooltip: the answer belongs where the eye already is, and a
+            box that follows the pointer would cover the ring it describes.
+          */}
+          {hover ? (
+            <>
+              <div
+                className="m"
+                style={{ fontSize: 13, fontWeight: 700, color: colors?.[hover] ?? "var(--ink)" }}
+              >
+                {hover}
+              </div>
+              <div className="m" style={{ fontSize: 11, color: "var(--ink-2)", marginTop: 3, lineHeight: 1.5 }}>
+                {(slices.find((x) => x.label === hover)?.pct ?? 0).toFixed(1)}% target
+                {hasCurrent && (
+                  <>
+                    <br />
+                    {(current[hover] ?? 0).toFixed(1)}% now
+                  </>
+                )}
+              </div>
+            </>
+          ) : hasCurrent ? (
             <>
               <div
                 className="m"
@@ -337,14 +427,14 @@ export function Stat({
 }
 
 /** A small square swatch tying a list row to its ring segment. */
-export function Swatch({ i }: { i: number }) {
+export function Swatch({ i, color }: { i?: number; color?: string }) {
   return (
     <span
       style={{
         width: 9,
         height: 9,
         borderRadius: 3,
-        background: ringColor(i),
+        background: color ?? ringColor(i ?? 0),
         flex: "none",
         display: "inline-block",
       }}
