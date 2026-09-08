@@ -74,7 +74,25 @@ export function TokenPicker({
           return;
         }
         const rows = j.tokens as TokenRow[];
-        setTokens(rows);
+        // The cash asset can never appear in this list: it is built from pairs
+        // quoted in USDT, and there is no USDTUSDT. So removing the cash leg
+        // used to be one-way — the picker had no row to add it back with.
+        // It is always addable, so it is always here, at the top.
+        const CASH = "USDT";
+        const withCash = rows.some((t) => t.symbol === CASH)
+          ? rows
+          : [
+              {
+                symbol: CASH,
+                pair: CASH,
+                priceUsd: 1,
+                change24hPct: 0,
+                quoteVolume24hUsd: Number.POSITIVE_INFINITY,
+                categories: ["cash"] as CategoryKey[],
+              },
+              ...rows,
+            ];
+        setTokens(withCash);
         onUniverse?.(
           new Set((j.universe as string[] | undefined) ?? rows.map((t) => t.symbol)),
         );
@@ -128,7 +146,7 @@ export function TokenPicker({
         <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Add assets</h2>
         {tokens ? (
           <span style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
-            {tokens.length} tradable pairs · live prices
+            {tokens.filter((t) => t.pair !== t.symbol).length} tradable pairs · live prices
           </span>
         ) : (
           <Skeleton w={150} h={11} />

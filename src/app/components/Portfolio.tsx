@@ -23,10 +23,20 @@ export function Portfolio({
   series?: Record<string, number[]>;
 }) {
   const rows = state.rows.filter((r) => r.targetWeight > 0 || r.currentValueUsd > 0);
-  // Ring shows the target allocation, ordered largest first so the ramp reads.
+  // The ring's caption promises the inner arc is where you actually are, so it
+  // has to include what you actually hold — including a position with no target
+  // at all, which is exactly the case the picture exists to show. Filtering to
+  // targeted positions drew an inner ring that stopped at 49% on a full
+  // portfolio, and left the two largest holdings out of the legend entirely.
+  // Targeted first, largest first; then held-but-untargeted, largest first.
   const slices = [...rows]
-    .filter((r) => r.targetWeight > 0)
-    .sort((a, b) => b.targetWeight - a.targetWeight)
+    .filter((r) => r.targetWeight > 0 || r.currentWeight > 0)
+    .sort(
+      (a, b) =>
+        b.targetWeight - a.targetWeight ||
+        b.currentWeight - a.currentWeight ||
+        a.symbol.localeCompare(b.symbol),
+    )
     .map((r) => ({ label: r.symbol, pct: r.targetWeight * 100 }));
   const ringIndex = new Map(slices.map((s, i) => [s.label, i]));
   // Keyed by symbol, so a position keeps its colour when the weights move.
