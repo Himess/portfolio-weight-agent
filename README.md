@@ -204,9 +204,44 @@ Two findings worth having in writing, because both cost time to discover:
   the difference between a security claim and a measurement: funds cannot leave an
   account through this surface because the surface has no tool that moves them.
 
-The granted OAuth scope is recorded too — `mcp:account:read mcp:spot:trade
-mcp:master:read mcp:wallet:transfer mcp:futures:trade mcp:margin:loan`. Note what
-the vocabulary does *not* contain: there is no withdrawal scope to request.
+### Least privilege, and what it actually costs
+
+Binance's consent screen offers six scopes and pre-ticks all of them. This
+deployment declines three. The granted scope is:
+
+```
+mcp:account:read   mcp:spot:trade   mcp:master:read
+```
+
+Refused: `mcp:futures:trade`, `mcp:margin:loan`, `mcp:wallet:transfer`. A
+long-horizon spot rebalancer has no use for leverage, for borrowing, or for
+moving funds between wallets, so it does not hold the ability to do any of them.
+
+This is not a preference expressed in a config file. Turning those three off
+removes the tools from the connection — they stop being offered to the client
+and cannot be called at all:
+
+| Dropped with the scope | What it did |
+|---|---|
+| `wallet.userUniversalTransfer` | move funds between wallets and accounts |
+| `futures_usds.newOrder`, `futures_coin.newOrder`, leverage and margin-type setters | open a leveraged position |
+| `margin.marginAccountNewOrder`, `margin.marginAccountBorrowRepay` | trade on margin, borrow |
+| `convert.sendQuoteRequest`, `convert.acceptQuote`, `convert.placeLimitOrder` | Convert — a cost the narrowing did have |
+
+That last row is the honest price of the choice. Convert is a legitimate
+execution route for a rebalance and the execution layer can select it; with this
+scope it is unavailable, so every leg goes to the spot book. Named here rather
+than left for someone to discover.
+
+What is left is spot trading and reads. Note also what the scope vocabulary does
+*not* contain anywhere: there is no withdrawal scope to request, which matches
+the 81-tool surface having no tool that moves funds off the account.
+
+One caveat worth stating precisely, because the looser version would be wrong:
+the underlying API key still reports `permitsUniversalTransfer: true`. The scope
+removes the *tool*, so this connection cannot call it — but the flag lives on the
+key, not the grant, and clearing it takes a separate step in Binance's own API
+management. `enableWithdrawals` is false at that level regardless.
 
 A separate boundary, in this repo rather than on Binance's side: **this app never
 calls a write tool.** `src/adapters/mcp.ts` resolves a `placeOrder` capability and
@@ -830,8 +865,9 @@ Reproduce with `npm run dev` after capturing a dataset:
   so there is no headless path. This is an on-demand review, not a daemon — by design, not omission.
 - **Replay slippage is modelled.** Historical order-book depth is not available, so replay uses a
   synthetic book with a fixed spread and linear impact. Live mode uses real depth. The UI says which.
-- **Convert is offered as an execution method but not separately priced.** Its quote is treated as
-  equivalent to a market order for cost purposes.
+- **Convert is offered as an execution method but not separately priced,** and the least-privilege
+  scope this deployment grants does not include it — so in practice every leg goes to the spot book.
+  Where it is available, its quote is treated as equivalent to a market order for cost purposes.
 - **Baskets are pinned at approval** and never re-resolve on their own. Silent membership changes
   would destroy trust. Re-resolve explicitly if you want to.
 
