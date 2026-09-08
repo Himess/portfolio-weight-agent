@@ -123,7 +123,10 @@ already been interrupted both feed the timing call.
   asking why a decision was made, not what you would decide today.
 
 - **Quantities are the server's, never yours.** Do not compute, round, or restate
-  an order size. Use the numbers returned verbatim.
+  an order size. Send `qtyStr` exactly as given: it is the same number as `qty`
+  written as a plain decimal, because a re-serialised float can reach Binance as
+  `6.4e-4` and is rejected with *illegal characters in parameter 'quantity'*. For
+  a BUY, `quoteOrderQty: estNotionalUsd` avoids the question entirely.
 
 ## What this skill cannot do
 

@@ -71,6 +71,25 @@ const HoldingsShape = z
   .array(z.object({ symbol: z.string(), qty: z.number().finite().nonnegative() }))
   .describe("Balances read from the Binance MCP server: [{ symbol, qty }].");
 
+
+/**
+ * A quantity as Binance will accept it: plain decimal, never exponential.
+ *
+ * The plan used to hand back a bare JSON number, which is correct and not
+ * enough. Anything between here and the exchange may re-serialise it, and a
+ * small size that becomes `6.4e-4` on the wire is rejected outright —
+ * `-1100 Illegal characters found in parameter 'quantity'`. That is a live
+ * order failing at the confirmation step for a formatting reason, which is the
+ * worst possible place to discover it.
+ *
+ * The value is already rounded to the pair's stepSize by candidate generation,
+ * so this only fixes the notation. Eight decimals covers Binance spot.
+ */
+function decimal(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "0";
+  return n.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 function quantitiesOf(holdings: { symbol: string; qty: number }[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const h of holdings) {
@@ -407,6 +426,8 @@ export function createServer(): McpServer {
           symbol: t.symbol,
           pair: t.pair,
           qty: t.qty,
+          /** Send this, not `qty` — see decimal(). */
+          qtyStr: decimal(t.qty),
           method: t.method,
           limitPriceOffsetBps: t.limitPriceOffsetBps,
           estPriceUsd: Number(t.estExecPrice.toFixed(6)),
@@ -428,8 +449,11 @@ export function createServer(): McpServer {
         })),
 
         howToExecute: acting
-          ? "Send each leg in order through the Binance MCP server. Binance will ask the user " +
-            "to confirm each one. Nothing has been placed by this server."
+          ? "Send each leg in order through the Binance MCP server, passing `qtyStr` verbatim as " +
+            "the quantity — a re-serialised float can reach the exchange as 6.4e-4 and is " +
+            "rejected. For a BUY you may send `quoteOrderQty: estNotionalUsd` instead, which " +
+            "avoids the question. Binance asks the user to confirm each one; nothing has been " +
+            "placed by this server."
           : "Nothing to send. Ask again later, or call explain_decision to see why.",
       });
     },

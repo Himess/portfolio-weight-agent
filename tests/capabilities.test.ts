@@ -99,3 +99,32 @@ describe("which Binance tool the app decides to call", () => {
     expect(caps.balances).toBe("spot.getAccount");
   });
 });
+
+describe("a quantity has to survive the trip to Binance", () => {
+  // The plan's `qty` is a JSON number, which is correct and not sufficient:
+  // anything between the tool and the exchange may re-serialise it, and a size
+  // that arrives as 6.4e-4 is rejected with "-1100 Illegal characters found in
+  // parameter 'quantity'" — a live order dying at the confirmation step for a
+  // formatting reason. This is the format that does not.
+  const decimal = (n: number) =>
+    !Number.isFinite(n) || n <= 0 ? "0" : n.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
+
+  it("never emits exponential notation, at any size Binance allows", () => {
+    for (const q of [0.00064, 0.0123, 0.000064, 0.0000064, 0.00000064, 1, 148.89, 12345.6789]) {
+      expect(decimal(q)).not.toMatch(/e/i);
+    }
+  });
+
+  it("round-trips to the same number", () => {
+    for (const q of [0.00064, 0.0123, 0.00000064, 148.89, 0.4631]) {
+      expect(Number(decimal(q))).toBeCloseTo(q, 8);
+    }
+  });
+
+  it("keeps the trailing digits that matter and drops the ones that do not", () => {
+    expect(decimal(0.00064)).toBe("0.00064");
+    expect(decimal(0.0123)).toBe("0.0123");
+    expect(decimal(0.00000064)).toBe("0.00000064");
+    expect(decimal(2)).toBe("2");
+  });
+});
