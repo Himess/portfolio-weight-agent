@@ -244,13 +244,13 @@ export function ProposalView({
 
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "18px 22px" }}>
           <button className="btn btn-primary" onClick={onApprove}>
-            Approve — send to Binance
+            Approve this plan
           </button>
           <button className="btn" onClick={onDismiss}>
             Not now
           </button>
           <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
-            Each order is confirmed by you in Binance before it executes.
+            Approving records the decision and shows you the orders. Nothing is sent from here.
           </span>
         </div>
       </div>
@@ -444,9 +444,11 @@ export function Handoff({ proposal, onBack }: { proposal: ProposalType; onBack: 
           Confirmation handoff
         </h2>
         <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "10px 0 0", maxWidth: "64ch", lineHeight: 1.6 }}>
-          Orders go to Binance one at a time, and Binance surfaces each one for you to confirm before
-          it executes. This app cannot place an order on your behalf. There is no withdrawal scope in
-          the Binance MCP server, so funds cannot leave your account through it.
+          <b style={{ color: "var(--ink)" }}>This app does not place orders — it hands them to you.</b>{" "}
+          Place each one in Binance, or ask your MCP client to send it through the Binance server,
+          where Binance asks you to confirm it. Then tick it off here, one at a time, so the
+          sequence stays in the order the plan needs. There is no withdrawal scope in the Binance
+          MCP server, so funds cannot leave your account through it either way.
         </p>
       </div>
 
@@ -478,10 +480,10 @@ export function Handoff({ proposal, onBack }: { proposal: ProposalType; onBack: 
             {usd(t.estNotionalUsd)}
           </div>
           {i <= sent ? (
-            <span className="pill pill-accent">awaiting your confirmation in Binance</span>
+            <span className="pill pill-green">placed</span>
           ) : (
             <button className="btn" disabled={i !== sent + 1} onClick={() => setSent(i)} style={{ padding: "8px 14px", fontSize: 12 }}>
-              Send order {i + 1}
+              Mark {i + 1} as placed
             </button>
           )}
         </div>
