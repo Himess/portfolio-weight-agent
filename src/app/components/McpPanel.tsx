@@ -180,7 +180,20 @@ export function McpPanel({ onConnectionChange }: { onConnectionChange?: (connect
                 onChange={(e) => setToken(e.target.value)}
                 placeholder="Bearer token from your MCP client"
                 type="password"
-                autoComplete="off"
+                /*
+                 * Masked because it is a live credential, and marked so that no
+                 * password manager offers to save it. Browsers largely ignore
+                 * autoComplete="off" on a password field; "one-time-code" is the
+                 * value they do not offer to remember, and the data-* opt-outs
+                 * cover 1Password, LastPass and Bitwarden. Without these, pasting
+                 * this raises a "save password?" bubble — over the top of a
+                 * screen someone may well be recording.
+                 */
+                autoComplete="one-time-code"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore
+                data-form-type="other"
                 spellCheck={false}
                 style={{
                   width: "100%",
