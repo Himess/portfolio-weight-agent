@@ -355,7 +355,16 @@ export default function Page() {
           source={source}
           setSource={setSource}
           accountReady={accountReady}
-          onAccountChange={setAccountReady}
+          onAccountChange={(connected) => {
+            setAccountReady(connected);
+            // Connecting an account and then still reading typed-in holdings is
+            // surprising: the only reason to connect one is to use it. So the
+            // source follows the connection — and falls back when it goes away,
+            // because a review against an account that is no longer there fails
+            // at the worst moment rather than the earliest one.
+            if (connected) setSource("mcp");
+            else setSource((s) => (s === "mcp" ? "public" : s));
+          }}
           bar={bar}
           setBar={setBar}
           dataset={dataset}

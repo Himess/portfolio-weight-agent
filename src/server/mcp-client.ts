@@ -51,7 +51,16 @@ async function rpc(method: string, params: Record<string, unknown>): Promise<unk
   const text = await res.text();
 
   if (res.status === 401) {
-    throw new NotConnected("Binance rejected the token — connect again.");
+    // "Rejected" is accurate and useless on its own. In practice a 401 here has
+    // one overwhelming cause: the token was rotated. Reconnecting the server in
+    // an MCP client — including re-consenting to change scopes — issues a new
+    // one and kills the old immediately, so a token copied minutes earlier is
+    // already dead. Saying so turns a dead end into one action.
+    throw new NotConnected(
+      "Binance rejected this token (401). It has almost certainly been rotated — " +
+        "reconnecting the server in your MCP client, or re-consenting to change scopes, " +
+        "issues a new token and invalidates the old one. Copy the current token and paste it again.",
+    );
   }
   if (!res.ok) {
     throw new Error(`MCP ${method} failed (HTTP ${res.status}): ${text.slice(0, 200)}`);
@@ -85,8 +94,23 @@ export async function discover(force = false): Promise<Discovery> {
     clientInfo: { name: "portfolio-weight-agent", version: "1.0.0" },
   });
 
-  const result = (await rpc("tools/list", {})) as { tools?: McpTool[] } | undefined;
-  const tools = Array.isArray(result?.tools) ? result.tools : [];
+  // Binance paginates tools/list at 50 and documents neither the page size nor
+  // the cursor. A single call returns a plausible-looking list that stops inside
+  // `margin.*` — no spot, no wallet, no sub-account — so capability resolution
+  // would decide the server cannot place an order while it plainly can, and the
+  // panel would report a tool count a third short. Follow the cursor.
+  const tools: McpTool[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+
+  do {
+    const result = (await rpc("tools/list", cursor ? { cursor } : {})) as
+      | { tools?: McpTool[]; nextCursor?: string }
+      | undefined;
+    if (Array.isArray(result?.tools)) tools.push(...result.tools);
+    cursor = result?.nextCursor;
+    pages += 1;
+  } while (cursor && pages < 20); // a cursor that never clears is a bug, not a long list
 
   discovery = {
     tools,
