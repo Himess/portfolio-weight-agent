@@ -28,10 +28,11 @@ import { COOKIE, unseal } from "./sealed";
 
 export function restoreSession(req: Request): void {
   const cookie = req.headers.get("cookie");
-  if (!cookie) return;
-  const match = cookie.match(new RegExp(`${COOKIE.token}=([^;]+)`));
-  if (!match) return;
-  adoptToken(unseal<McpToken>(match[1]));
+  const match = cookie?.match(new RegExp(`${COOKIE.token}=([^;]+)`));
+  // Adopt unconditionally, including the no-cookie case. Returning early here
+  // left the previous caller's token in the module global, which on serverless
+  // is shared with every other request the instance serves.
+  adoptToken(match ? unseal<McpToken>(match[1]) : null);
 }
 
 // ---------------------------------------------------------------------------

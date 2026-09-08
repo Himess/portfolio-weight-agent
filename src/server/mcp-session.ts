@@ -134,9 +134,19 @@ export function setToken(next: McpToken): void {
   token = next;
 }
 
-/** Adopt a token recovered from the request's cookie. */
+/**
+ * Adopt whatever the request's cookie carried — including nothing.
+ *
+ * Assigning unconditionally is the whole point. This used to be
+ * `if (next) token = next`, which meant a request arriving with no cookie left
+ * the previous caller's token sitting in the module global. On serverless that
+ * global is shared by every request the instance serves, so one visitor who
+ * connected an account leaked their balances to the next stranger whose request
+ * landed on the same warm instance. The cookie is the only durable store; a
+ * request without one has no session, and must see none.
+ */
 export function adoptToken(next: McpToken | null): void {
-  if (next) token = next;
+  token = next;
 }
 
 export function getToken(): McpToken | null {

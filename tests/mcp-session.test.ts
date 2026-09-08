@@ -99,3 +99,65 @@ describe("token store", () => {
     expect(tokenExpired({ accessToken: "x", expiresAt: null, obtainedAt: 0, via: "pasted" })).toBe(false);
   });
 });
+
+/**
+ * One visitor's account must never be visible to the next.
+ *
+ * The token lives in a module-level variable, which on serverless is shared by
+ * every request the warm instance serves. `restoreSession` used to return early
+ * when a request carried no cookie, and `adoptToken` used to assign only when
+ * given something — so a stranger's cookie-less request inherited whatever the
+ * previous caller had connected, and `/api/mcp/status` answered it with their
+ * real balances. The site was public when this was found. These tests are the
+ * reason it cannot come back.
+ */
+describe("a session belongs to one visitor", () => {
+  it("clears the connected account when a request carries no session", async () => {
+    const { adoptToken } = await import("../src/server/mcp-session");
+    delete process.env.BINANCE_MCP_TOKEN;
+
+    setToken({ accessToken: "someone-elses", expiresAt: null, obtainedAt: Date.now(), via: "pasted" });
+    expect(getToken()?.accessToken).toBe("someone-elses");
+
+    // The next request arrives with no cookie.
+    adoptToken(null);
+    expect(getToken()).toBeNull();
+  });
+
+  it("restoreSession forgets the previous caller when the cookie is absent", async () => {
+    const { restoreSession } = await import("../src/server/guard");
+    delete process.env.BINANCE_MCP_TOKEN;
+
+    setToken({ accessToken: "someone-elses", expiresAt: null, obtainedAt: Date.now(), via: "pasted" });
+    restoreSession(new Request("https://example.test/api/mcp/status"));
+    expect(getToken()).toBeNull();
+  });
+
+  it("forgets it even when the request has cookies, just not ours", async () => {
+    const { restoreSession } = await import("../src/server/guard");
+    delete process.env.BINANCE_MCP_TOKEN;
+
+    setToken({ accessToken: "someone-elses", expiresAt: null, obtainedAt: Date.now(), via: "pasted" });
+    restoreSession(
+      new Request("https://example.test/api/mcp/status", {
+        headers: { cookie: "theme=dark; _vercel_jwt=abc" },
+      }),
+    );
+    expect(getToken()).toBeNull();
+  });
+
+  it("still restores the visitor's own sealed session", async () => {
+    const { restoreSession } = await import("../src/server/guard");
+    const { COOKIE, seal } = await import("../src/server/sealed");
+    delete process.env.BINANCE_MCP_TOKEN;
+    clearToken();
+
+    const mine = { accessToken: "mine", expiresAt: null, obtainedAt: Date.now(), via: "pasted" as const };
+    restoreSession(
+      new Request("https://example.test/api/mcp/status", {
+        headers: { cookie: `${COOKIE.token}=${seal(mine, 86_400_000)}` },
+      }),
+    );
+    expect(getToken()?.accessToken).toBe("mine");
+  });
+});
