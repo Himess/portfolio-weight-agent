@@ -791,14 +791,14 @@ src/server/     session, rate limits, error shaping, the watch runner, Telegram
 src/mcp/        the same agent as an MCP server — stdio and streamable HTTP
 skills/         the Skills Hub skill — the workflow, when to trigger it, and the rules
 scripts/        klines capture · replay · band sweep · knife sweep · backtest · decision log
-tests/          252 tests, no API key required
+tests/          253 tests, no API key required
 ```
 
 Everything talks to one adapter interface with three implementations, so the replay harness, the
 public-data path and the live MCP path exercise identical logic.
 
 ```bash
-npm test        # 252 tests, no network, no key
+npm test        # 253 tests, no network, no key
 npm run typecheck
 npm run build
 ```
