@@ -1124,9 +1124,19 @@ function Allocate(props: {
 
           {props.source === "public" && (
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-              <div className="lbl" style={{ marginBottom: 9 }}>
+              <div className="lbl" style={{ marginBottom: 4 }}>
                 Your holdings
               </div>
+              {/*
+                These start filled in, because an empty form cannot show anyone
+                what the app does. Prefilled numbers that look like a real
+                portfolio should say so out loud, though — otherwise the NAV on
+                the next screen reads as a claim about whoever is looking.
+              */}
+              <p style={{ fontSize: 11.5, color: "var(--ink-3)", margin: "0 0 9px", lineHeight: 1.55 }}>
+                Example quantities, so there is something to price — replace them with your own.
+                They stay in this browser and are never saved.
+              </p>
               {props.holdings.map((h, i) => (
                 <div key={i} style={{ display: "flex", gap: 7, marginBottom: 7 }}>
                   <input
