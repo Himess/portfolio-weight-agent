@@ -21,14 +21,46 @@ export type McpTool = {
 };
 
 /**
- * Capability patterns, ordered most- to least-specific. These are matched
- * against discovered names — they are guesses about naming, never assumptions
- * that a tool exists.
+ * Capability patterns, ordered most- to least-specific, plus what must never
+ * match. These are guesses about naming, never assumptions that a tool exists.
+ *
+ * The rejects are not decoration. Both of the original patterns resolved to the
+ * wrong tool against Binance's real list, and neither failure was visible until
+ * an account had money in it:
+ *
+ *   - `/balance/i` matched `futures_coin.futuresAccountBalance` first, because
+ *     it sorts ahead of anything spot. The app asked an empty futures wallet
+ *     what it held, was told nothing, and reported the sub-account as unfunded
+ *     while `spot.getAccount` sat in the same list holding the money.
+ *   - `/(spot|market).*order/i` matched `spot.deleteOpenOrders`. The panel
+ *     reported "can send orders" on the strength of a tool that cancels them.
+ *
+ * So: prefer the exact spot tool, then spot-shaped names, and refuse the
+ * families this product does not trade in. A spot rebalancer reading a futures
+ * balance is not a near miss, it is a different account.
  */
-const CAPABILITY_PATTERNS: Record<string, RegExp[]> = {
-  balances: [/balance/i, /account.*(asset|holding|position)/i, /portfolio/i],
-  placeOrder: [/place.*order/i, /create.*order/i, /(spot|market).*order/i, /\border\b/i],
-  orderStatus: [/order.*(status|query|get)/i, /query.*order/i],
+type CapabilitySpec = { prefer: RegExp[]; reject?: RegExp };
+
+const CAPABILITY_PATTERNS: Record<string, CapabilitySpec> = {
+  balances: {
+    prefer: [
+      /^spot\.getAccount$/i,
+      /^spot\..*account/i,
+      /^wallet\..*balance/i,
+      /balance/i,
+      /account.*(asset|holding|position)/i,
+    ],
+    reject: /futures|margin|coin_?m|earn|funding/i,
+  },
+  placeOrder: {
+    prefer: [/^spot\.newOrder$/i, /^spot\..*(new|place|create).*order/i, /(new|place|create).*order/i],
+    // Every cancel and lookup tool also contains "order".
+    reject: /futures|margin|delete|cancel|query|get|open|all|history|test/i,
+  },
+  orderStatus: {
+    prefer: [/^spot\.getOrder$/i, /^spot\..*(query|get)Order$/i, /order.*(status|query)/i],
+    reject: /futures|margin|delete|cancel|new|place|create/i,
+  },
 };
 
 export type ResolvedCapabilities = {
@@ -40,8 +72,10 @@ export type ResolvedCapabilities = {
 export function resolveCapabilities(tools: McpTool[]): ResolvedCapabilities {
   const names = tools.map((t) => t.name);
   const pick = (key: keyof typeof CAPABILITY_PATTERNS): string | null => {
-    for (const re of CAPABILITY_PATTERNS[key]) {
-      const hit = names.find((n) => re.test(n));
+    const { prefer, reject } = CAPABILITY_PATTERNS[key];
+    const eligible = reject ? names.filter((n) => !reject.test(n)) : names;
+    for (const re of prefer) {
+      const hit = eligible.find((n) => re.test(n));
       if (hit) return hit;
     }
     return null;
