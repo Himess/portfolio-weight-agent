@@ -12,7 +12,7 @@ description: |
   Do NOT use for price predictions, entry/exit timing on a single asset, futures,
   margin, or anything that is not weight drift in a spot portfolio.
   It never places an order. Orders go to the Binance MCP server, where Binance
-  asks the user to confirm each one.
+  client asks the user before sending each one.
 metadata:
   author: Himess
   version: "1.0.0"
@@ -100,7 +100,8 @@ already been interrupted both feed the timing call.
 
 - **It never places an order.** `propose_rebalance` returns a plan. Send the legs
   through the Binance MCP server (`spot.newOrder`), in the order given, and
-  Binance will ask the user to confirm each one. Do not describe an order as
+  Ask the user before sending each one — that gate is the client's, not the
+  exchange's. Do not describe an order as
   placed until Binance has confirmed it.
 
 - **A decline is an answer, not a failure.** If the verdict is `HOLD` or

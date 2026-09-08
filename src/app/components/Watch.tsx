@@ -250,7 +250,7 @@ export function Watch({
       )}
       <p style={{ ...p, fontSize: 11.5, marginTop: 12 }}>
         The bot can only message you. It cannot place, cancel or approve an order — approval stays in
-        Binance, in front of you.
+        your own client, which asks before it sends.
       </p>
     </Card>
   );

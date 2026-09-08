@@ -199,6 +199,19 @@ Two findings worth having in writing, because both cost time to discover:
   simply never seen `spot`, `wallet` or `sub_account`. The script now follows
   `nextCursor` to exhaustion and records the page count, so the file cannot
   silently under-report again.
+- **There is no confirmation step on the exchange side, and we measured that rather
+  than assuming it.** Binance's documentation says *"every trade — confirmed by you
+  first"* and *"this confirm-before-execute pattern applies to every non-read
+  action"*, but never states **where** that is enforced. The tool surface answers it:
+  across all 81 there is no confirm, approve or verify tool — `spot.newOrder` places
+  the order in one call. And with the MCP client's own permission prompt disabled, a
+  live order filled with no further gate.
+
+  So the gate is the **client's**, not the exchange's. That does not weaken what this
+  app does — it still sends nothing, and there is still no withdrawal tool — but it
+  does change who is holding the door. Anything claiming Binance shows you an approval
+  screen is describing a convention, not an enforcement.
+
 - **There is no withdrawal tool.** Across all 81, the only name matching
   "withdraw" is `wallet.withdrawHistory`, which *reads* past withdrawals. This is
   the difference between a security claim and a measurement: funds cannot leave an
@@ -246,7 +259,8 @@ management. `enableWithdrawals` is false at that level regardless.
 A separate boundary, in this repo rather than on Binance's side: **this app never
 calls a write tool.** `src/adapters/mcp.ts` resolves a `placeOrder` capability and
 displays whether the connected server has one — and never invokes it. The orders
-go through Binance's own confirmation, in front of the person.
+go out through the Binance MCP server, and the client asks before sending — see the note on
+where that gate actually lives.
 
 ---
 
@@ -876,7 +890,7 @@ Reproduce with `npm run dev` after capturing a dataset:
 ## Disclosures
 
 **This is not investment advice.** You are the decision-maker. The agent proposes; nothing executes
-without you. Every order requires your confirmation in Binance before it executes, and this
+without you. Every order is sent by your MCP client, which asks you first, and this
 application cannot bypass that gate — nor does it try to. There is no withdrawal tool in the
 Binance MCP surface — measured, across all 81 — so funds cannot leave your account through this
 tool.

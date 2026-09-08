@@ -284,7 +284,7 @@ export function McpPanel({ onConnectionChange }: { onConnectionChange?: (connect
 
           <p style={{ fontSize: 11, color: "var(--ink-3)", margin: "10px 0 0", lineHeight: 1.55 }}>
             Tool names were discovered at runtime, not hardcoded — Binance publishes none. Every
-            order still needs your confirmation in Binance, and there is no withdrawal scope.
+            order is sent by your MCP client, which asks you first, and there is no withdrawal tool.
           </p>
 
           {status.tools && status.tools.length > 0 && (

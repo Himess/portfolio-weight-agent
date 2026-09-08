@@ -138,7 +138,9 @@ export function createServer(): McpServer {
         "moment* to correct a known drift, and can decline. Read balances from the Binance MCP " +
         "server and pass them in as `holdings`; this server fetches its own market data. It " +
         "never places an order: propose_rebalance returns a materialised plan for you to send " +
-        "through the Binance MCP server, where Binance asks the user to confirm each one.",
+        "through the Binance MCP server. Your client should ask the user before sending: Binance's " +
+        "docs assert a confirm step but do not say where it is enforced, and a client with its " +
+        "prompt disabled fills the order without one.",
     },
   );
 
@@ -308,12 +310,25 @@ export function createServer(): McpServer {
           driftPp: Number(r.driftPp.toFixed(2)),
           bandPp: Number(r.bandPp.toFixed(2)),
           outsideBand: r.outsideBand,
+          // Cash is the residual: its drift is the mirror image of everything
+          // else, and you never trade it to fix it — you trade the other legs
+          // and it lands where it lands. Reported so a caller does not read the
+          // cash row as an action it failed to take.
+          ...(r.symbol === found.allocation.cashSymbol ? { isCash: true, correctedVia: "the other legs" } : {}),
           toTargetUsd: Number(r.deltaUsd.toFixed(2)),
         })),
-        outsideBand: state.rows.filter((r) => r.outsideBand && r.symbol !== CASH).map((r) => r.symbol),
+        // Named for what it is. This used to be `outsideBand`, which read as a
+        // contradiction against the row above whenever cash breached: the row
+        // said true and the summary omitted it. Both were right; only one was
+        // about what can be traded.
+        actionable: state.rows
+          .filter((r) => r.outsideBand && r.symbol !== found.allocation.cashSymbol)
+          .map((r) => r.symbol),
+        outsideBandIncludingCash: state.rows.filter((r) => r.outsideBand).map((r) => r.symbol),
         note:
           "Bands scale with each asset's realised volatility, so a calm asset has a tighter " +
-          "band than a jumpy one at the same target weight.",
+          "band than a jumpy one at the same target weight. `actionable` excludes cash because " +
+          "cash is corrected by trading the other legs, never by trading cash.",
       });
     },
   );
@@ -452,8 +467,8 @@ export function createServer(): McpServer {
           ? "Send each leg in order through the Binance MCP server, passing `qtyStr` verbatim as " +
             "the quantity — a re-serialised float can reach the exchange as 6.4e-4 and is " +
             "rejected. For a BUY you may send `quoteOrderQty: estNotionalUsd` instead, which " +
-            "avoids the question. Binance asks the user to confirm each one; nothing has been " +
-            "placed by this server."
+            "avoids the question. Ask the user before sending each leg — that gate is the client's, " +
+            "not the exchange's. Nothing has been placed by this server."
           : "Nothing to send. Ask again later, or call explain_decision to see why.",
       });
     },

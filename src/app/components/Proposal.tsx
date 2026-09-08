@@ -446,7 +446,7 @@ export function Handoff({ proposal, onBack }: { proposal: ProposalType; onBack: 
         <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "10px 0 0", maxWidth: "64ch", lineHeight: 1.6 }}>
           <b style={{ color: "var(--ink)" }}>This app does not place orders — it hands them to you.</b>{" "}
           Place each one in Binance, or ask your MCP client to send it through the Binance server,
-          where Binance asks you to confirm it. Then tick it off here, one at a time, so the
+          which will ask you before it sends. Then tick it off here, one at a time, so the
           sequence stays in the order the plan needs. There is no withdrawal scope in the Binance
           MCP server, so funds cannot leave your account through it either way.
         </p>
